@@ -177,7 +177,7 @@ scan Digests/{topic-slug}/*.md for dates in range [week_start .. week_end]
 
 ### `obsidian/reader.py` Parsing Contract
 
-**Flagged articles:** `reader.py` operates only on files in `Digests/{topic-slug}/` — there is no cross-topic scanning. `reader.py` reads `flag_tag` from the topic config in `topics.yaml` (default: `#deepdive` if not set). A `###`-level heading followed on any line within its section by the `flag_tag` marks that article as flagged. The URL is taken from the markdown link in the `###` heading line. The `flag_tag` is matched as a word boundary using the regex `(?<!\S){flag_tag}(?!\S)` — it will not match if embedded inside a URL or sentence.
+**Flagged articles:** `reader.py` operates only on files in `Digests/{topic-slug}/` — there is no cross-topic scanning. `reader.py` reads `flag_tag` from the topic config in `topics.yaml` (default: `#deepdive` if not set). A `###`-level heading followed on any line within its section by the `flag_tag` marks that article as flagged. "Its section" ends at the next `###` heading, `---` separator, or `##` heading — whichever comes first. The URL is taken from the markdown link in the `###` heading line. The `flag_tag` is matched as a word boundary: `(?<!\S)<flag_tag>(?!\S)` where `<flag_tag>` is the literal string substituted in Python (e.g., `re.compile(r'(?<!\S)' + re.escape(flag_tag) + r'(?!\S)')`) — it will not match if embedded inside a URL or sentence.
 
 **Manual links:** All non-empty lines under `## Manual Links` are parsed. Each line may be a bare URL or a `[text](url)` markdown link. Lines that are only `-` or whitespace are skipped. Lines that do not contain a valid URL are skipped and logged as warnings.
 
@@ -249,7 +249,22 @@ Auto-updated weekly from flagged articles. Edit manually to tune.
 
 ### `preferences/store.py` — Signal Extraction
 
-After each weekly deep dive, `store.py` extracts signals from all flagged articles and manual links:
+```python
+def update_preferences(
+    vault_path: str,
+    preferences_file: str,       # relative path within vault, e.g. "preferences.md"
+    topic_slug: str,
+    phase1_outputs: list[dict],  # list of Phase 1 JSON objects (with "keywords" array)
+    articles: list[Article],     # flagged articles (for domain/author extraction)
+) -> None:
+    """
+    Read preferences.md from vault_path, merge new signals into the topic_slug
+    frontmatter key, write back preserving the prose body. On YAML parse error
+    or I/O error, logs the error and returns without writing (non-fatal).
+    """
+```
+
+`store.py` reads and writes `preferences.md` directly from `vault_path` (the local checkout path). It does not re-clone the vault. After each weekly deep dive, it extracts signals from flagged articles and manual links:
 
 - **Domains:** extracted from article URLs using `urllib.parse` (e.g., `eugeneyan.com` from `https://eugeneyan.com/writing/...`)
 - **Authors:** extracted from article metadata if available (RSS `<author>` field, byline in HTML `<meta name="author">`); Bluesky handle if source is Bluesky
@@ -265,7 +280,28 @@ After each weekly deep dive, `store.py` extracts signals from all flagged articl
 
 ### `preferences/scorer.py` — Article Scoring
 
-Scores each candidate article on a 0–100 scale before Claude generation:
+```python
+@dataclass
+class Article:
+    url: str
+    title: str
+    description: str
+    author: str | None
+    source: str
+
+def score_and_filter(
+    articles: list[Article],
+    topic_config: dict,          # from topics.yaml for this topic
+    preferences: dict | None,    # parsed frontmatter from preferences.md, or None
+    max_results: int,
+) -> list[Article]:
+    """
+    Score articles, filter out those with score <= 0, sort descending, cap at max_results.
+    preferences=None when preferences.md is missing (first run) — falls back to topic_config only.
+    """
+```
+
+Scores each candidate article before Claude generation:
 
 | Signal | Points |
 |---|---|
@@ -295,9 +331,9 @@ Default: `claude-sonnet-4-6`. Configurable via `config/topics.yaml` (`claude_mod
 ### Weekly Deep Dive (`generators/deepdive.py`)
 
 - **Two Claude call phases per topic per week.**
-- Phase 1: one call per article (title, URL, full fetched content truncated to 80k tokens, web search results). Uses the Anthropic API's **structured output / tool_use mode** to return a JSON object with fields: `summary` (string), `key_insights` (array of strings), `research_expansion` (string), `keywords` (array of 3–5 strings). Truncation to 80k tokens is performed in `deepdive.py` using a character heuristic (1 token ≈ 4 characters; truncate at 320,000 characters) before the API call. `store.py` reads the `keywords` array directly from the JSON output — no prose parsing required.
-- Phase 2: one synthesis call with all Phase 1 outputs concatenated, plus topic keywords from `topics.yaml` and `positive_keywords`/`reference_links` from `preferences.md`. Prompt: identify cross-article themes, extract practical action steps grounded in the user's focus areas. Output: synthesis + action steps markdown.
-- Context budget: each Phase 1 call is capped at ~100k tokens of input (full article text truncated if needed). If an article exceeds the limit, the first 80k tokens are used and a note is appended.
+- Phase 1: one call per article (title, URL, full fetched content, web search results). Uses the Anthropic API's **structured output / tool_use mode** to return a JSON object with fields: `summary` (string), `key_insights` (array of strings), `research_expansion` (string), `keywords` (array of 3–5 strings). Article content is truncated to **80k tokens** before the API call using a character heuristic (1 token ≈ 4 chars → truncate at 320,000 chars). `store.py` reads the `keywords` array directly from the JSON output.
+- Phase 2: one synthesis call with all Phase 1 JSON outputs serialized as input, plus topic keywords from `topics.yaml` and `positive_keywords`/`reference_links` from `preferences.md`. Prompt: identify cross-article themes, extract practical action steps grounded in the user's focus areas. Output: synthesis + action steps markdown.
+- When `max_articles_deepdive` is exceeded, articles are kept in chronological order (earliest flagged first); skipped articles are listed by URL in a `> Note: X articles were skipped (limit reached)` blockquote at the top of the output file.
 
 ---
 
@@ -311,8 +347,8 @@ obsidian_vault:
   deepdive_folder: "DeepDives"
   preferences_file: "preferences.md"
 
-claude_model: "claude-sonnet-4-6"       # optional override
-web_search_provider: "tavily"           # "tavily" or "exa"
+claude_model: "claude-sonnet-4-6"       # global model for both digest and deep dive (intentionally not per-topic)
+web_search_provider: "tavily"           # "tavily" or "exa"; fails fast at startup if the corresponding API key env var is missing
 max_articles_per_digest: 20             # cap per topic per day
 max_articles_deepdive: 15               # cap on flagged articles per weekly deep dive
 web_search_queries_per_article: 2       # search queries per article in deep dive
@@ -323,7 +359,7 @@ topics:
     keywords: ["LLM", "RAG", "agent", "fine-tuning", "evals"]
     reference_links:
       - "https://some-article-you-like.com"
-    flag_tag: "#deepdive"
+    flag_tag: "#deepdive"             # optional, default: "#deepdive"
     sources:
       hackernews: true
       reddit:
@@ -403,13 +439,18 @@ jobs:
   daily-digest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout KnowledgeTracker
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/checkout@v4
+      - name: Checkout Obsidian vault
+        uses: actions/checkout@v4
         with:
           repository: you/your-vault
           ssh-key: ${{ secrets.VAULT_DEPLOY_KEY }}
           path: vault
+          # actions/checkout with ssh-key handles SSH agent setup automatically
 
       - uses: actions/setup-python@v5
         with:
@@ -436,25 +477,32 @@ jobs:
           git pull --rebase origin main
           git add .
           git diff --cached --quiet || git commit -m "KnowledgeTracker: daily digest $(date +%Y-%m-%d)"
-          git push
+          git push origin HEAD
 ```
 
-**`.github/workflows/weekly_deepdive.yml`:** identical structure, with `cron: '0 8 * * 1'` (8am UTC Monday), `run: python run.py weekly`, and commit message `"KnowledgeTracker: weekly deep dive $(date +%Y-%m-%d)"`.
+**`.github/workflows/weekly_deepdive.yml`:** same structure as above, with:
+- `cron: '0 8 * * 1'` (8am UTC Monday)
+- `run: python run.py weekly`
+- commit message: `"KnowledgeTracker: weekly deep dive $(date +%Y-%m-%d)"`
+- The vault checkout step is required (same as daily) so `run.py weekly` can scan digest files
 
 **Notes:**
-- `actions/checkout` with `ssh-key` automatically configures the remote's push URL — no `git remote set-url` needed.
-- `git pull --rebase` before commit handles concurrent local + Actions runs without non-fast-forward errors.
+- `persist-credentials: false` on the KnowledgeTracker checkout prevents the HTTPS token from interfering with the SSH-keyed vault push.
+- `actions/checkout` with `ssh-key` handles SSH agent setup automatically — no `webfactory/ssh-agent` step needed.
+- `git push origin HEAD` explicitly targets the tracking remote branch, regardless of the local HEAD state.
+- `git pull --rebase` before commit handles concurrent local + Actions runs.
 - `git diff --cached --quiet || git commit` prevents empty commits.
 - **`git_sync.py` is used for local runs only.** `run.py` skips it when `GITHUB_ACTIONS=true`.
+- **Concurrent local + Actions run conflict:** if both write the same digest file (same topic, same day), `git pull --rebase` will produce a content conflict on identical filenames. This is a known limitation for personal use — users should avoid running locally on the same day as the scheduled Action, or use `workflow_dispatch` to disable the cron on days they plan to run locally.
 
 ---
 
 ## Error Handling
 
-- Each source is isolated; failures are caught, logged, and noted in the digest frontmatter (`sources_failed`).
+- Each source is isolated; failures are caught, logged, and noted in the digest frontmatter (`sources_failed`). Rate-limit errors from Reddit, Bluesky, or Tavily/Exa are treated the same as general source failures — caught, logged, and the source is skipped for that run (no per-source retry logic beyond what the library provides by default).
 - Claude API failures: retry up to **3 times** with exponential backoff (1s, 2s, 4s). Rate-limit errors (`429`) wait for the `Retry-After` header value before retrying. Server errors (`5xx`) use the backoff schedule. After 3 failures, the digest writes a minimal fallback file (`## Error\nDigest generation failed — retried 3 times.`) so the vault always gets a dated entry. For deep dive Phase 1 failures, the article is skipped and noted in the output. For Phase 2 (synthesis) failures, the per-article outputs are written as-is without a synthesis section, with a note appended.
 - Git push failures: workflow exits non-zero → GitHub Actions notifies via email on failure.
-- Missing `preferences.md`: scorer falls back to topic config only; `preferences.md` is created fresh on first weekly run.
+- Missing `preferences.md`: scorer falls back to topic config only (acceptable — preferences are additive over time); `preferences.md` is created fresh on first weekly run. A stale `preferences.md` (not updated this week) is also acceptable — the scorer uses whatever signals are present.
 - Article fetch failures in deep dive: the article is included with a note ("content unavailable") and Claude generates what it can from the title/URL alone.
 
 ---
