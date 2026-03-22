@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-uv sync                          # install all deps (runtime + dev) into .venv
+uv sync                          # install all deps (runtime + dev) into .venv — run after cloning
 uv run pytest                    # run full test suite
 uv run pytest tests/test_dedup.py            # run a single test file
 uv run pytest tests/test_dedup.py::test_url_dedup_removes_duplicates  # run one test
