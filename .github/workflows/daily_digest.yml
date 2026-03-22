@@ -1,0 +1,54 @@
+name: Daily Digest
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 07:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout KnowledgeTracker repo
+        uses: actions/checkout@v4
+
+      - name: Set up SSH for vault
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VAULT_DEPLOY_KEY }}
+
+      - name: Checkout Obsidian vault
+        run: |
+          git clone ${{ secrets.VAULT_REPO }} vault
+          echo "VAULT_PATH=$(pwd)/vault" >> $GITHUB_ENV
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          VAULT_PATH: ${{ env.VAULT_PATH }}
+        run: python run.py daily
+
+      - name: Push vault changes
+        run: |
+          cd vault
+          git config user.email "actions@github.com"
+          git config user.name "KnowledgeTracker Bot"
+          git pull --rebase origin main
+          git add .
+          git diff --cached --quiet || git commit -m "chore: daily digest $(date -u +%Y-%m-%d)"
+          git push origin main
