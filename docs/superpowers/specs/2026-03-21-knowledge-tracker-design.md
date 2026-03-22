@@ -142,7 +142,7 @@ The `## Manual Links` section is a dedicated space for the user to paste URLs fo
 
 ### Date Range
 
-The weekly deep dive processes digest files from the **7 calendar days of the prior week: Monday through Sunday** (i.e., a Monday 8am run covers the Mon–Sun that just ended). Files are identified by their filename date (`YYYY-MM-DD.md`), not modification time. `week_start` = most recent Monday before today; `week_end` = most recent Sunday before today. If fewer than 7 files exist (e.g., first week of use), all available files are processed. If no files are found, the workflow exits cleanly with a log message and no output is written.
+The weekly deep dive processes digest files from the prior 7 calendar days. Date range is computed as: `week_start = today - 7 days`, `week_end = today - 1 day`. For a Monday March 23 run: `week_start = 2026-03-16`, `week_end = 2026-03-22`. Files are identified by their filename date (`YYYY-MM-DD.md`), not modification time. If fewer than 7 files exist (e.g., first week of use), all available files in range are processed. If no files are found, the workflow exits cleanly with a log message and no output is written.
 
 The output filename uses the `week_start` date: `DeepDives/{topic-slug}/{week_start}-week.md` (e.g., `2026-03-16-week.md` for the week of March 16–22).
 
@@ -177,7 +177,7 @@ scan Digests/{topic-slug}/*.md for dates in range [week_start .. week_end]
 
 ### `obsidian/reader.py` Parsing Contract
 
-**Flagged articles:** `reader.py` operates only on files in `Digests/{topic-slug}/` — there is no cross-topic scanning. A `###`-level heading followed on any line within its section by the `flag_tag` (e.g., `#deepdive`) marks that article as flagged. The URL is taken from the markdown link in the `###` heading line. The `flag_tag` is matched as a word boundary: it must be preceded and followed by whitespace, end-of-line, or start-of-line (regex: `(?<!\S)#deepdive(?!\S)`) — it will not match if embedded inside a URL or a sentence word.
+**Flagged articles:** `reader.py` operates only on files in `Digests/{topic-slug}/` — there is no cross-topic scanning. `reader.py` reads `flag_tag` from the topic config in `topics.yaml` (default: `#deepdive` if not set). A `###`-level heading followed on any line within its section by the `flag_tag` marks that article as flagged. The URL is taken from the markdown link in the `###` heading line. The `flag_tag` is matched as a word boundary using the regex `(?<!\S){flag_tag}(?!\S)` — it will not match if embedded inside a URL or sentence.
 
 **Manual links:** All non-empty lines under `## Manual Links` are parsed. Each line may be a bare URL or a `[text](url)` markdown link. Lines that are only `-` or whitespace are skipped. Lines that do not contain a valid URL are skipped and logged as warnings.
 
@@ -256,10 +256,12 @@ After each weekly deep dive, `store.py` extracts signals from all flagged articl
 - **Keywords:** extracted by asking Claude to return 3–5 topical keywords per article during the per-article deep dive call (reuses existing output, no extra API call)
 
 **Merging rules:**
+- `store.py` uses `topics[].slug` from `topics.yaml` as the key in `preferences.md` frontmatter (e.g., slug `ai_engineering` → `topics.ai_engineering`). If the slug changes, the old key remains in `preferences.md` as a dead entry; implementers should manually remove it.
 - New domains/authors/keywords are appended to existing lists (additive only — no automatic removal)
 - Duplicates are deduplicated on write
 - The prose body of `preferences.md` is preserved unchanged; only the YAML frontmatter block is rewritten
 - Manual edits to frontmatter (e.g., adding negative keywords) are preserved because the full frontmatter is read before merging
+- **Write failure handling:** If `store.py` fails to write `preferences.md` (YAML parse error on a manually edited file, or I/O error), the weekly run logs the error and continues without updating preferences — the deep dive output is still written and pushed. The error is surfaced in the GitHub Actions log.
 
 ### `preferences/scorer.py` — Article Scoring
 
@@ -273,7 +275,7 @@ Scores each candidate article on a 0–100 scale before Claude generation:
 | Title/description contains a `negative_keywords` match | -30 per match |
 | URL domain matches a `reference_links` domain (from **both** `topics[].reference_links` in config **and** `preferences.md` frontmatter) | +15 |
 
-Articles with a score ≤ 0 are filtered out entirely. Remaining articles are sorted descending and capped at `max_articles_per_digest`. Scoring runs after URL deduplication and before the Claude call.
+Scores are clamped to `[−100, 100]` after summing all signals. Articles with a final score ≤ 0 are filtered out entirely. Remaining articles are sorted descending and capped at `max_articles_per_digest`. Scoring runs after URL deduplication and before the Claude call.
 
 ---
 
@@ -293,7 +295,7 @@ Default: `claude-sonnet-4-6`. Configurable via `config/topics.yaml` (`claude_mod
 ### Weekly Deep Dive (`generators/deepdive.py`)
 
 - **Two Claude call phases per topic per week.**
-- Phase 1: one call per article (title, URL, full fetched content, web search results). Prompt: produce a structured output with these explicit sections: `## Summary`, `## Key Insights` (bullet list), `## Research Expansion`, `## Keywords` (comma-separated list of 3–5 topical keywords). `store.py` extracts keywords by parsing the `## Keywords` section from Phase 1 output.
+- Phase 1: one call per article (title, URL, full fetched content truncated to 80k tokens, web search results). Uses the Anthropic API's **structured output / tool_use mode** to return a JSON object with fields: `summary` (string), `key_insights` (array of strings), `research_expansion` (string), `keywords` (array of 3–5 strings). Truncation to 80k tokens is performed in `deepdive.py` using a character heuristic (1 token ≈ 4 characters; truncate at 320,000 characters) before the API call. `store.py` reads the `keywords` array directly from the JSON output — no prose parsing required.
 - Phase 2: one synthesis call with all Phase 1 outputs concatenated, plus topic keywords from `topics.yaml` and `positive_keywords`/`reference_links` from `preferences.md`. Prompt: identify cross-article themes, extract practical action steps grounded in the user's focus areas. Output: synthesis + action steps markdown.
 - Context budget: each Phase 1 call is capped at ~100k tokens of input (full article text truncated if needed). If an article exceeds the limit, the first 80k tokens are used and a note is appended.
 
@@ -359,63 +361,91 @@ topics:
 
 GitHub Trending requires no token (public page scrape).
 
-### Workflow Structure (both workflows follow this pattern)
+### Environment Variables (Secrets → Env Vars)
 
-```yaml
-steps:
-  - name: Checkout KnowledgeTracker
-    uses: actions/checkout@v4
+All secrets are injected as environment variables in the `Run digest / deep dive` step. Each source module reads the following env vars:
 
-  - name: Checkout Obsidian vault
-    uses: actions/checkout@v4
-    with:
-      repository: you/your-vault
-      ssh-key: ${{ secrets.VAULT_DEPLOY_KEY }}
-      path: vault
+| Environment Variable | Read by | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `generators/digest.py`, `generators/deepdive.py` | Claude API |
+| `VAULT_PATH` | `run.py` (overrides `local_path`) | Path to checked-out vault |
+| `TAVILY_API_KEY` | `sources/web_search.py` (when `web_search_provider: tavily`) | Tavily search |
+| `EXA_API_KEY` | `sources/web_search.py` (when `web_search_provider: exa`) | Exa search |
+| `REDDIT_CLIENT_ID` | `sources/reddit.py` | Reddit API |
+| `REDDIT_CLIENT_SECRET` | `sources/reddit.py` | Reddit API |
+| `BLUESKY_HANDLE` | `sources/bluesky.py` | Bluesky auth |
+| `BLUESKY_PASSWORD` | `sources/bluesky.py` | Bluesky auth |
 
-  - name: Set up Python 3.12
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.12"
+### `obsidian/git_sync.py` Interface (local runs only)
 
-  - name: Install dependencies
-    run: pip install -r requirements.txt
-
-  - name: Run digest / deep dive
-    env:
-      VAULT_PATH: ${{ github.workspace }}/vault
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # ... other secrets as env vars
-    run: python run.py daily   # or weekly
-
-  # daily_digest.yml uses:
-  - name: Commit and push vault changes
-    run: |
-      cd vault
-      git config user.name "KnowledgeTracker"
-      git config user.email "knowledge-tracker@users.noreply.github.com"
-      git pull --rebase origin main
-      git add .
-      git diff --cached --quiet || git commit -m "KnowledgeTracker: daily digest $(date +%Y-%m-%d)"
-      git push
-
-  # weekly_deepdive.yml uses:
-  - name: Commit and push vault changes
-    run: |
-      cd vault
-      git config user.name "KnowledgeTracker"
-      git config user.email "knowledge-tracker@users.noreply.github.com"
-      git pull --rebase origin main
-      git add .
-      git diff --cached --quiet || git commit -m "KnowledgeTracker: weekly deep dive $(date +%Y-%m-%d)"
-      git push
+```python
+def sync_vault(vault_path: str, commit_message: str) -> None:
+    """
+    Pull latest, stage all changes, commit if any, and push.
+    Runs: git pull --rebase, git add ., git diff --cached check, git commit, git push.
+    Raises: GitSyncError on push failure.
+    """
 ```
 
-**Notes on the workflow:**
-- `actions/checkout` with `ssh-key: ${{ secrets.VAULT_DEPLOY_KEY }}` automatically configures the remote's push URL to use the SSH key — no `git remote set-url` step is needed.
-- The `git pull --rebase` before commit ensures a local run and a concurrent Actions run do not produce a non-fast-forward conflict; the second writer rebases on top of the first.
-- The `git diff --cached --quiet || git commit` guard prevents empty commits on days with no new content.
-- **`git_sync.py` is used for local runs only.** `run.py` detects `GITHUB_ACTIONS=true` env var and skips `git_sync.py`. For local runs, `git_sync.py` also runs `git pull --rebase` before pushing.
+`run.py` calls `git_sync.sync_vault(vault_path, message)` after writing all output files. Skipped entirely when `GITHUB_ACTIONS=true`.
+
+### Workflow Skeletons
+
+**`.github/workflows/daily_digest.yml`:**
+
+```yaml
+on:
+  schedule:
+    - cron: '0 7 * * *'    # 7am UTC daily
+  workflow_dispatch:
+
+jobs:
+  daily-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: you/your-vault
+          ssh-key: ${{ secrets.VAULT_DEPLOY_KEY }}
+          path: vault
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run daily digest
+        env:
+          VAULT_PATH: ${{ github.workspace }}/vault
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+        run: python run.py daily
+
+      - name: Commit and push vault changes
+        run: |
+          cd vault
+          git config user.name "KnowledgeTracker"
+          git config user.email "knowledge-tracker@users.noreply.github.com"
+          git pull --rebase origin main
+          git add .
+          git diff --cached --quiet || git commit -m "KnowledgeTracker: daily digest $(date +%Y-%m-%d)"
+          git push
+```
+
+**`.github/workflows/weekly_deepdive.yml`:** identical structure, with `cron: '0 8 * * 1'` (8am UTC Monday), `run: python run.py weekly`, and commit message `"KnowledgeTracker: weekly deep dive $(date +%Y-%m-%d)"`.
+
+**Notes:**
+- `actions/checkout` with `ssh-key` automatically configures the remote's push URL — no `git remote set-url` needed.
+- `git pull --rebase` before commit handles concurrent local + Actions runs without non-fast-forward errors.
+- `git diff --cached --quiet || git commit` prevents empty commits.
+- **`git_sync.py` is used for local runs only.** `run.py` skips it when `GITHUB_ACTIONS=true`.
 
 ---
 
