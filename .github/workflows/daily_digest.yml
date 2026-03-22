@@ -22,14 +22,13 @@ jobs:
           git clone ${{ secrets.VAULT_REPO }} vault
           echo "VAULT_PATH=$(pwd)/vault" >> $GITHUB_ENV
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          enable-cache: true
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: uv sync
 
       - name: Run daily digest
         env:
@@ -41,7 +40,7 @@ jobs:
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           VAULT_PATH: ${{ env.VAULT_PATH }}
-        run: python run.py daily
+        run: uv run python run.py daily
 
       - name: Push vault changes
         run: |

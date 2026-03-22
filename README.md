@@ -16,7 +16,7 @@ A personal knowledge pipeline that generates daily topic digests and weekly deep
 ```bash
 git clone https://github.com/you/KnowledgeTracker.git
 cd KnowledgeTracker
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 2. Configure
@@ -25,15 +25,14 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your API keys
 
-cp config/topics.yaml config/my_topics.yaml
-# Edit config/my_topics.yaml with your topics, vault path, etc.
+# Edit config/topics.yaml with your vault path, topics, and sources
 ```
 
 ### 3. Run locally
 
 ```bash
-python run.py daily
-python run.py weekly
+uv run python run.py daily
+uv run python run.py weekly
 ```
 
 ## GitHub Actions
@@ -131,5 +130,5 @@ Contains a synthesis section, then per-article deep dives with key insights and 
 ## Tests
 
 ```bash
-pytest -v
+uv run pytest -v
 ```

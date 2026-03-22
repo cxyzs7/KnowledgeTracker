@@ -1,0 +1,35 @@
+[project]
+name = "knowledge-tracker"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic",
+    "praw",
+    "atproto",
+    "tavily-python",
+    "feedparser",
+    "httpx",
+    "beautifulsoup4",
+    "pyyaml",
+    "gitpython",
+    "sentence-transformers",
+    "torch",
+    "scikit-learn",
+    "apscheduler",
+]
+
+[project.scripts]
+knowledge-tracker = "run:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
