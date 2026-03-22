@@ -1,0 +1,16 @@
+anthropic
+praw
+atproto
+tavily-python
+feedparser
+httpx
+beautifulsoup4
+pyyaml
+gitpython
+sentence-transformers
+torch
+scikit-learn
+apscheduler
+pytest
+pytest-asyncio
+respx

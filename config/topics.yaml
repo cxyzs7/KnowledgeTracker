@@ -1,0 +1,31 @@
+obsidian_vault:
+  repo: "git@github.com:you/your-vault.git"
+  local_path: "/path/to/local/vault"
+  digests_folder: "Digests"
+  deepdive_folder: "DeepDives"
+  preferences_file: "preferences.md"
+
+claude_model: "claude-sonnet-4-6"
+web_search_provider: "tavily"
+max_articles_per_digest: 20
+max_articles_deepdive: 15
+web_search_queries_per_article: 2
+dedup_similarity_threshold: 0.85
+
+topics:
+  - name: "AI Engineering"
+    slug: "ai_engineering"
+    keywords: ["LLM", "RAG", "agent", "fine-tuning", "evals"]
+    reference_links: []
+    flag_tag: "#deepdive"
+    sources:
+      hackernews: true
+      reddit:
+        subreddits: ["MachineLearning", "LocalLLaMA"]
+      bluesky:
+        hashtags: ["#llm"]
+        accounts: []
+      github_trending:
+        language: ""
+      web_search: true
+      feeds: []
