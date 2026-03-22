@@ -59,10 +59,14 @@ topics.yaml + preferences.md (from vault)
         ↓
   fetch from all configured sources (per topic, in parallel)
         ↓
-  deduplicate articles by URL across sources
+  deduplicate by URL (exact match)
+        ↓
+  embed all articles (title + description) via sentence-transformers
+  semantic dedup: cluster articles with cosine similarity ≥ 0.85;
+  keep highest-scored representative per cluster, note merged sources
         ↓
   score & rank articles by relevance
-  (topic keywords + reference links + learned preferences)
+  (semantic similarity to topic keywords + reference links + learned preferences)
   → cap at max_articles_per_digest (default: 20)
         ↓
   Claude API: one call per digest, all articles passed as structured input
@@ -90,9 +94,13 @@ Each source fetches independently. If a source fails, it is skipped and the dige
 
 ### Deduplication
 
-- Articles are deduplicated by URL after all sources return results.
-- If the same URL appears in multiple topics' digests, each topic processes it independently (topics are fully isolated).
-- If the same URL is flagged across multiple digest files in a week, it appears only once in the weekly deep dive (deduplicated by URL at read time in `reader.py`).
+**Step 1 — URL dedup:** exact URL match across all sources for the same topic. Merged into one article, preserving the higher-engagement source metadata (e.g., HN points over web search snippet).
+
+**Step 2 — Semantic dedup:** embed all remaining articles (title + description) using `all-MiniLM-L6-v2`. Build a cosine similarity matrix. Articles with pairwise similarity ≥ 0.85 are grouped into a cluster. The highest-scored article (by source engagement — HN points, Reddit upvotes, or recency for others) is kept as the cluster representative. Its digest entry notes merged sources: `*Also covered by: Reddit, Web Search*`.
+
+**Cross-topic:** topics are processed independently — no dedup across topics.
+
+**Weekly deep dive:** if the same URL is flagged across multiple digest files in a week, it is included only once (URL dedup at read time in `reader.py`). Semantic dedup is not re-run at the weekly stage — the flagged set is assumed small enough to be intentional.
 
 ### Digest Output Format (`Digests/{topic-slug}/YYYY-MM-DD.md`)
 
@@ -288,30 +296,41 @@ class Article:
     description: str
     author: str | None
     source: str
+    embedding: list[float] | None   # set after embed step; None before embedding
 
 def score_and_filter(
     articles: list[Article],
     topic_config: dict,          # from topics.yaml for this topic
     preferences: dict | None,    # parsed frontmatter from preferences.md, or None
+    embedder: SentenceTransformer,
     max_results: int,
 ) -> list[Article]:
     """
-    Score articles, filter out those with score <= 0, sort descending, cap at max_results.
-    preferences=None when preferences.md is missing (first run) — falls back to topic_config only.
+    Score articles semantically + structurally, filter score <= 0,
+    sort descending, cap at max_results.
+    preferences=None on first run — falls back to topic_config only.
     """
 ```
 
-Scores each candidate article before Claude generation:
+Scoring is a two-component blend: **semantic similarity** (primary) + **structural signals** (secondary):
+
+**Semantic component (0–60 points):**
+- Embed the topic's `keywords` list joined as a sentence + `positive_keywords` from preferences + text of each `reference_links` URL title (fetched once at startup, cached)
+- Compute cosine similarity between article embedding and this combined topic vector
+- Similarity is scaled linearly to 0–60 points (similarity 1.0 → 60pts, 0.5 → 30pts, 0.0 → 0pts)
+
+**Structural component (0–40 points):**
 
 | Signal | Points |
 |---|---|
-| URL domain matches a `preferred_domains` entry | +20 |
-| Author matches a `preferred_authors` entry | +20 |
-| Title/description contains a `positive_keywords` match | +10 per match, max +30 |
-| Title/description contains a `negative_keywords` match | -30 per match |
-| URL domain matches a `reference_links` domain (from **both** `topics[].reference_links` in config **and** `preferences.md` frontmatter) | +15 |
+| URL domain matches a `preferred_domains` entry | +15 |
+| Author matches a `preferred_authors` entry | +15 |
+| URL domain matches a `reference_links` domain (from both config and preferences.md) | +10 |
+| Title/description contains a `negative_keywords` match | −25 per match |
 
-Scores are clamped to `[−100, 100]` after summing all signals. Articles with a final score ≤ 0 are filtered out entirely. Remaining articles are sorted descending and capped at `max_articles_per_digest`. Scoring runs after URL deduplication and before the Claude call.
+Total score = semantic + structural, clamped to `[−100, 100]`. Articles with score ≤ 0 are filtered out. Remaining articles are sorted descending and capped at `max_articles_per_digest`. Scoring runs after semantic deduplication and before the Claude call.
+
+**Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (22MB, CPU-only, ~5ms per article). Loaded once per run and reused across all topics. No API key required.
 
 ---
 
@@ -352,6 +371,7 @@ web_search_provider: "tavily"           # "tavily" or "exa"; fails fast at start
 max_articles_per_digest: 20             # cap per topic per day
 max_articles_deepdive: 15               # cap on flagged articles per weekly deep dive
 web_search_queries_per_article: 2       # search queries per article in deep dive
+dedup_similarity_threshold: 0.85        # cosine similarity threshold for semantic dedup (0.0–1.0)
 
 topics:
   - name: "AI Engineering"
@@ -534,4 +554,7 @@ All dependencies are pinned in `requirements.txt` (generated via `pip-compile` f
 | `pyyaml` | Config parsing |
 | `apscheduler` | Optional local scheduler |
 | `gitpython` | Git operations for local vault sync |
+| `sentence-transformers` | Local embeddings for semantic dedup + scoring (`all-MiniLM-L6-v2`) |
+| `torch` | Required by sentence-transformers (CPU-only install) |
+| `scikit-learn` | Cosine similarity matrix computation |
 | `pip-tools` | Dependency pinning (`pip-compile`) |
