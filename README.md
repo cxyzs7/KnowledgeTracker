@@ -2,133 +2,159 @@
 
 A personal knowledge pipeline that generates daily topic digests and weekly deep dives, saved as markdown to your Obsidian vault.
 
-## Features
+- **Daily digest** — fetches articles from Hacker News, Reddit, RSS feeds, GitHub Trending, Bluesky, and web search; deduplicates and scores by relevance; generates a markdown summary via Claude.
+- **Weekly deep dive** — reads articles you flagged `#deepdive` during the week, performs per-article research expansion via Claude, synthesises across all of them, and writes a comprehensive report.
+- **Preference learning** — your flagged articles automatically improve future scoring. Tune further by editing `preferences.md` in your vault.
 
-- **Daily Digest**: Fetches articles from Hacker News, Reddit, RSS feeds, GitHub Trending, Bluesky, and web search. Deduplicates (URL + semantic), scores by relevance, and generates a markdown digest via Claude.
-- **Weekly Deep Dive**: Reads articles flagged `#deepdive` (or your custom tag) from the week's digests plus manually added links. Performs per-article research expansion via Claude, then synthesises into a comprehensive weekly report.
-- **Preference Learning**: Flagged articles feed back into `preferences.md` in your vault to improve future scoring.
-- **Obsidian-native**: Output is standard markdown with YAML frontmatter, compatible with Obsidian tags and links.
+## Prerequisites
 
-## Setup
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
+- An [Anthropic API key](https://console.anthropic.com/)
+- A [Tavily](https://tavily.com/) or [Exa](https://exa.ai/) API key for web search
+- An Obsidian vault backed by a GitHub repo
 
-### 1. Clone and install
+## Installation
 
 ```bash
 git clone https://github.com/you/KnowledgeTracker.git
 cd KnowledgeTracker
 uv sync
-```
-
-### 2. Configure
-
-```bash
 cp .env.example .env
-# Edit .env with your API keys
-
-# Edit config/topics.yaml with your vault path, topics, and sources
 ```
-
-### 3. Run locally
-
-```bash
-uv run python run.py daily
-uv run python run.py weekly
-```
-
-## GitHub Actions
-
-Set the following repository secrets:
-
-| Secret | Description |
-|--------|-------------|
-| `VAULT_DEPLOY_KEY` | SSH private key with write access to your vault repo |
-| `VAULT_REPO` | SSH URL of your vault repo (e.g. `git@github.com:you/vault.git`) |
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `TAVILY_API_KEY` | Tavily search API key (or `EXA_API_KEY`) |
-| `REDDIT_CLIENT_ID` | Reddit app client ID (optional) |
-| `REDDIT_CLIENT_SECRET` | Reddit app client secret (optional) |
-| `BLUESKY_HANDLE` | Bluesky handle (optional) |
-| `BLUESKY_APP_PASSWORD` | Bluesky app password (optional) |
-
-Workflows run automatically:
-- **Daily digest**: every day at 07:00 UTC
-- **Weekly deep dive**: every Monday at 08:00 UTC
-
-Trigger manually via the Actions tab → workflow → "Run workflow".
 
 ## Configuration
 
-Edit `config/topics.yaml`:
+### 1. Edit `config/topics.yaml`
+
+Set your vault path and define your topics:
 
 ```yaml
 obsidian_vault:
-  repo: "git@github.com:you/your-vault.git"
-  local_path: "/path/to/local/vault"   # overridden by VAULT_PATH env var
+  repo: "git@github.com:you/your-vault.git"   # used by GitHub Actions
+  local_path: "/path/to/local/vault"           # your local vault directory
   digests_folder: "Digests"
   deepdive_folder: "DeepDives"
   preferences_file: "preferences.md"
 
 claude_model: "claude-sonnet-4-6"
-web_search_provider: "tavily"          # or "exa"
+web_search_provider: "tavily"   # or "exa"
 max_articles_per_digest: 20
 max_articles_deepdive: 15
 dedup_similarity_threshold: 0.85
 
 topics:
   - name: "AI Engineering"
-    slug: "ai_engineering"
-    keywords: ["LLM", "RAG", "agent"]
-    reference_links: []
-    flag_tag: "#deepdive"
+    slug: "ai_engineering"          # used as folder name and preferences key
+    keywords: ["LLM", "RAG", "agent", "evals"]
+    reference_links: []             # example articles that define the topic's style
+    flag_tag: "#deepdive"           # Obsidian tag to flag for weekly deep dive
     sources:
       hackernews: true
       reddit:
-        subreddits: ["MachineLearning"]
+        subreddits: ["MachineLearning", "LocalLLaMA"]
       bluesky:
         hashtags: ["#llm"]
         accounts: []
       github_trending:
         language: ""
       web_search: true
-      feeds: []
+      feeds: []                     # list of RSS/Atom feed URLs
 ```
 
-## Output format
+Add as many topics as you like. Each gets its own digest folder and preferences entry.
 
-### Daily digest (`Digests/<slug>/YYYY-MM-DD.md`)
+### 2. Set environment variables
 
-```markdown
----
-date: 2026-03-21
-topic: AI Engineering
-sources_fetched: [hackernews, reddit]
-sources_failed: []
-article_count: 12
----
+Fill in `.env` (copied from `.env.example`):
 
-# AI Engineering — Daily Digest · 2026-03-21
+| Variable | Required | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | |
+| `TAVILY_API_KEY` | Yes (or EXA) | Set `web_search_provider: tavily` in config |
+| `EXA_API_KEY` | Yes (or Tavily) | Set `web_search_provider: exa` in config |
+| `REDDIT_CLIENT_ID` | No | Reddit source skipped if absent |
+| `REDDIT_CLIENT_SECRET` | No | Reddit source skipped if absent |
+| `BLUESKY_HANDLE` | No | Bluesky source skipped if absent |
+| `BLUESKY_APP_PASSWORD` | No | Bluesky source skipped if absent |
 
-## Top Stories
+The app fails at startup with a clear error if a required key is missing.
 
-### [Article Title](https://example.com)
-*Source: Hacker News · 300 points*
-Summary of the article.
-
-#deepdive
-
----
-
-## Manual Links
-<!-- Add links here for weekly deep dive inclusion -->
--
-```
-
-### Weekly deep dive (`DeepDives/<slug>/YYYY-MM-DD-week.md`)
-
-Contains a synthesis section, then per-article deep dives with key insights and research expansion.
-
-## Tests
+## Running locally
 
 ```bash
-uv run pytest -v
+uv run python run.py daily    # generate today's digest
+uv run python run.py weekly   # generate this week's deep dive
 ```
+
+Digests are written to `{vault}/Digests/{slug}/YYYY-MM-DD.md`.
+Deep dives are written to `{vault}/DeepDives/{slug}/YYYY-MM-DD-week.md`.
+
+Local runs automatically commit and push to your vault repo via `git_sync`.
+
+## GitHub Actions setup
+
+Workflows run on a schedule (daily digest at 07:00 UTC, weekly deep dive at 08:00 UTC every Monday) and can be triggered manually from the Actions tab.
+
+### Create a vault deploy key
+
+```bash
+ssh-keygen -t ed25519 -C "knowledge-tracker-deploy" -f vault_deploy_key -N ""
+```
+
+1. Add `vault_deploy_key.pub` as a **Deploy Key with write access** in your vault repo (Settings → Deploy keys).
+2. Add the private key contents as `VAULT_DEPLOY_KEY` secret in this repo.
+
+### Add repository secrets
+
+In this repo: Settings → Secrets and variables → Actions → New repository secret.
+
+| Secret | Value |
+|---|---|
+| `VAULT_DEPLOY_KEY` | Private key from above |
+| `VAULT_REPO` | SSH URL of your vault, e.g. `git@github.com:you/vault.git` |
+| `ANTHROPIC_API_KEY` | |
+| `TAVILY_API_KEY` | (or `EXA_API_KEY`) |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Optional |
+| `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional |
+
+## Day-to-day usage
+
+### Flagging articles for the weekly deep dive
+
+In a daily digest file, add your `flag_tag` (default `#deepdive`) on its own line below any article heading:
+
+```markdown
+### [Some Interesting Article](https://example.com)
+*Source: Hacker News · 300 points*
+Summary here.
+
+#deepdive
+```
+
+### Adding your own links
+
+Each digest has a `## Manual Links` section at the bottom. Add bare URLs or `[title](url)` entries — the weekly pipeline picks these up alongside flagged articles:
+
+```markdown
+## Manual Links
+- https://example.com/something-i-found
+- [Great post](https://example.com/post)
+```
+
+### Tuning what you see
+
+`preferences.md` in your vault is auto-updated after each weekly deep dive with domains, authors, and keywords extracted from your flagged articles. Edit it directly in Obsidian to boost or suppress content:
+
+```yaml
+---
+topics:
+  ai_engineering:
+    preferred_domains: ["eugeneyan.com", "lilianweng.github.io"]
+    preferred_authors: []
+    positive_keywords: ["RAG", "evals", "agents"]
+    negative_keywords: ["crypto", "web3"]   # articles matching these are filtered out
+    reference_links: []
+---
+```
+
+Only `negative_keywords` requires manual entry — everything else is populated automatically from your reading history.
