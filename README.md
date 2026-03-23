@@ -92,14 +92,12 @@ Local runs automatically commit and push to your vault repo via `git_sync`.
 
 Workflows run on a schedule (daily digest at 07:00 UTC, weekly deep dive at 08:00 UTC every Monday) and can be triggered manually from the Actions tab.
 
-### Create a vault deploy key
+### Create a vault access token
 
-```bash
-ssh-keygen -t ed25519 -C "knowledge-tracker-deploy" -f vault_deploy_key -N ""
-```
-
-1. Add `vault_deploy_key.pub` as a **Deploy Key with write access** in your vault repo (Settings → Deploy keys).
-2. Add the private key contents as `VAULT_DEPLOY_KEY` secret in this repo.
+1. Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Set **Repository access** to your vault repo only.
+3. Grant **Contents: Read and write** permission.
+4. Copy the generated token.
 
 ### Add repository secrets
 
@@ -107,8 +105,8 @@ In this repo: Settings → Secrets and variables → Actions → New repository 
 
 | Secret | Value |
 |---|---|
-| `VAULT_DEPLOY_KEY` | Private key from above |
-| `VAULT_REPO` | SSH URL of your vault, e.g. `git@github.com:you/vault.git` |
+| `VAULT_TOKEN` | Fine-grained PAT from above |
+| `VAULT_REPO` | `owner/repo` of your vault, e.g. `cxyzs7/Vault` |
 | `ANTHROPIC_API_KEY` | |
 | `TAVILY_API_KEY` | |
 | `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional |

@@ -12,14 +12,9 @@ jobs:
       - name: Checkout KnowledgeTracker repo
         uses: actions/checkout@v4
 
-      - name: Set up SSH for vault
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VAULT_DEPLOY_KEY }}
-
       - name: Checkout Obsidian vault
         run: |
-          git clone ${{ secrets.VAULT_REPO }} vault
+          git clone https://x-access-token:${{ secrets.VAULT_TOKEN }}@github.com/${{ secrets.VAULT_REPO }} vault
           echo "VAULT_PATH=$(pwd)/vault" >> $GITHUB_ENV
 
       - name: Install uv
