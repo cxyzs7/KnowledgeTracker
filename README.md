@@ -72,8 +72,6 @@ Fill in `.env` (copied from `.env.example`):
 | `ANTHROPIC_API_KEY` | Yes | |
 | `TAVILY_API_KEY` | Yes (or EXA) | Set `web_search_provider: tavily` in config |
 | `EXA_API_KEY` | Yes (or Tavily) | Set `web_search_provider: exa` in config |
-| `REDDIT_CLIENT_ID` | No | Reddit source skipped if absent |
-| `REDDIT_CLIENT_SECRET` | No | Reddit source skipped if absent |
 | `BLUESKY_HANDLE` | No | Bluesky source skipped if absent |
 | `BLUESKY_APP_PASSWORD` | No | Bluesky source skipped if absent |
 
@@ -114,7 +112,6 @@ In this repo: Settings → Secrets and variables → Actions → New repository 
 | `VAULT_REPO` | SSH URL of your vault, e.g. `git@github.com:you/vault.git` |
 | `ANTHROPIC_API_KEY` | |
 | `TAVILY_API_KEY` | (or `EXA_API_KEY`) |
-| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Optional |
 | `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional |
 
 ## Day-to-day usage

@@ -1,27 +1,38 @@
-# tests/test_sources/test_reddit.py
-from unittest.mock import MagicMock, patch
+import respx
+import httpx
 from knowledge_tracker.sources.reddit import fetch
 
-def _make_post(title, url, score, author):
-    post = MagicMock()
-    post.title = title
-    post.url = url
-    post.score = score
-    post.author.name = author
-    post.selftext = ""
-    return post
+MOCK_RESPONSE = {
+    "data": {
+        "children": [
+            {"data": {
+                "title": "RAG pipelines",
+                "url": "https://example.com/rag",
+                "score": 400,
+                "author": "bob",
+                "selftext": "",
+            }}
+        ]
+    }
+}
 
-@patch("knowledge_tracker.sources.reddit.praw.Reddit")
-def test_fetch_returns_articles(mock_reddit_cls):
-    post = _make_post("RAG pipelines", "https://example.com/rag", 400, "bob")
-    mock_reddit_cls.return_value.subreddit.return_value.hot.return_value = [post]
+
+@respx.mock
+def test_fetch_returns_articles():
+    respx.get("https://www.reddit.com/r/MachineLearning/hot.json").mock(
+        return_value=httpx.Response(200, json=MOCK_RESPONSE)
+    )
     articles = fetch(subreddits=["MachineLearning"], limit=10)
     assert len(articles) == 1
     assert articles[0].title == "RAG pipelines"
     assert articles[0].source == "reddit"
+    assert articles[0].score == 400
 
-@patch("knowledge_tracker.sources.reddit.praw.Reddit")
-def test_fetch_returns_empty_on_failure(mock_reddit_cls):
-    mock_reddit_cls.side_effect = Exception("auth error")
+
+@respx.mock
+def test_fetch_returns_empty_on_failure():
+    respx.get("https://www.reddit.com/r/MachineLearning/hot.json").mock(
+        return_value=httpx.Response(429)
+    )
     articles = fetch(subreddits=["MachineLearning"])
     assert articles == []
