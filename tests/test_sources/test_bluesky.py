@@ -5,10 +5,10 @@ from knowledge_tracker.sources.bluesky import fetch
 @patch("knowledge_tracker.sources.bluesky.Client")
 def test_fetch_returns_articles(mock_client_cls):
     post = MagicMock()
-    post.post.record.text = "Great article on RAG https://example.com/rag"
-    post.post.author.handle = "alice.bsky.social"
-    post.post.uri = "at://alice/post/1"
-    mock_client_cls.return_value.app.bsky.feed.search_posts.return_value.feed = [post]
+    post.record.text = "Great article on RAG https://example.com/rag"
+    post.author.handle = "alice.bsky.social"
+    post.uri = "at://alice/post/1"
+    mock_client_cls.return_value.app.bsky.feed.search_posts.return_value.posts = [post]
     articles = fetch(hashtags=["#llm"], accounts=[], handle="test", password="test")
     assert len(articles) >= 1
     assert articles[0].source == "bluesky"

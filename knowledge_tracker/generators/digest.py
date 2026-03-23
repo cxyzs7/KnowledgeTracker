@@ -5,6 +5,13 @@ from knowledge_tracker.claude_client import call_with_retry
 
 logger = logging.getLogger(__name__)
 
+SYSTEM_PROMPT = """You are a senior engineer curating a daily digest for a developer who wants \
+high-signal, actionable content. Your priorities:
+- Avoid hype and marketing language. Favour depth and practicality.
+- If the same story appears across multiple sources, merge them into one entry and list all relevant links.
+- Omit sections that have nothing worth including today.
+- Quality over quantity: a tight digest of 10 great items beats 30 mediocre ones."""
+
 DIGEST_TOOL = {
     "name": "generate_digest",
     "description": "Generate a structured daily digest of articles for a topic.",
@@ -15,9 +22,13 @@ DIGEST_TOOL = {
                 "type": "string",
                 "description": (
                     "Full markdown body of the digest (no frontmatter). "
-                    "Start with '## Top Stories', then each article as "
-                    "'### [title](url)\\n*Source: {source} · {score} points*\\n{summary}\\n\\n{optional_flag_tag}\\n\\n---'. "
-                    "Articles that strongly match the topic should end with '#deepdive' on its own line."
+                    "Start with a '### Highlights' section: 3-5 bullet points, each one sentence on the most significant thing happening in the topic today — no links, no source attribution, just the insight. "
+                    "Then group articles into thematic sections using #### headings with an emoji: "
+                    "e.g. '#### 🔥 Top Stories', '#### 🛠️ Tools & Releases', '#### 💡 Practical Tips', "
+                    "'#### 📚 Tutorials & Guides', '#### 🤔 Research & Concepts', '#### 🔗 Worth Bookmarking'. "
+                    "Use whatever sections fit the day's content; omit empty ones; invent new ones as needed. "
+                    "Each article: '**title** — one sentence (what it is and why it matters). [{source}](url)'. "
+                    "No horizontal rules between articles. Do NOT add #deepdive tags."
                 ),
             },
             "sources_failed": {
@@ -37,12 +48,13 @@ def generate(
     model: str,
     topic: dict,
     articles: list[Article],
+    prefs: dict,
     date: str,
     sources_fetched: list[str],
 ) -> dict:
     """Generate a daily digest for one topic. Returns dict with body and metadata."""
     if not articles:
-        body = "## Top Stories\n\n*No articles found today.*\n"
+        body = "*No articles found today.*\n"
         return {"body": body, "sources_fetched": sources_fetched, "sources_failed": []}
 
     articles_text = "\n\n".join(
@@ -52,26 +64,38 @@ def generate(
         for i, a in enumerate(articles)
     )
 
-    prompt = f"""You are generating a daily digest for the topic: **{topic['name']}**.
+    # Build preference context from stored preferences
+    prefs = prefs or {}
+    pref_lines = []
+    if prefs.get("positive_keywords"):
+        pref_lines.append(f"Preferred keywords: {', '.join(prefs['positive_keywords'])}")
+    if prefs.get("preferred_domains"):
+        pref_lines.append(f"Trusted sources: {', '.join(prefs['preferred_domains'][:10])}")
+    if prefs.get("negative_keywords"):
+        pref_lines.append(f"Suppress topics: {', '.join(prefs['negative_keywords'])}")
+    pref_block = ("\n\nReader preferences (use to bias selection and tone):\n" + "\n".join(pref_lines)) if pref_lines else ""
 
-Topic keywords: {', '.join(topic.get('keywords', []))}
-Date: {date}
+    prompt = f"""Generate a daily digest for the topic: **{topic['name']}**
+Date: {date} | Keywords: {', '.join(topic.get('keywords', []))}
+{pref_block}
 
-Here are today's articles (already deduplicated and scored):
+Today's articles (already deduplicated and scored by relevance):
 
 {articles_text}
 
-Generate a markdown digest:
-- Include all articles with a brief 2–3 sentence summary
-- For articles that strongly match the topic keywords, add `#deepdive` on its own line after the summary
-- Keep each summary focused and informative
-- Use the exact tool schema format
+Instructions:
+- Open with a '### Highlights' section: 3-5 bullets, each one sentence capturing the most significant thing happening in the topic today. No links or source attribution — pure signal.
+- Then group into thematic sections (#### with emoji). Omit any section with nothing strong to include.
+- Merge items covering the same story into one entry; include all relevant links.
+- Each entry: bold plain title, em dash, one sentence on what it is and why it matters, then [source](url) at the end.
+- Rank by signal value, not score. Do NOT add #deepdive tags.
 """
 
     response = call_with_retry(
         client,
         model=model,
         max_tokens=4096,
+        system=SYSTEM_PROMPT,
         tools=[DIGEST_TOOL],
         messages=[{"role": "user", "content": prompt}],
         tool_choice={"type": "tool", "name": "generate_digest"},
@@ -83,7 +107,7 @@ Generate a markdown digest:
     )
     if not tool_use:
         logger.error("No tool_use block in digest response")
-        return {"body": "## Top Stories\n\n*Generation failed.*\n",
+        return {"body": "*Generation failed.*\n",
                 "sources_fetched": sources_fetched, "sources_failed": []}
 
     result = tool_use.input

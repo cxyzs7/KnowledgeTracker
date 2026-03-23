@@ -10,13 +10,16 @@ import argparse
 import logging
 import os
 import sys
+
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import date, timedelta
 
 import anthropic
 
 from knowledge_tracker.config import load_config
 from knowledge_tracker.models import Article
-from knowledge_tracker.dedup import url_dedup, semantic_dedup
+from knowledge_tracker.dedup import url_dedup, semantic_dedup, _get_model
 from knowledge_tracker.preferences.store import load_preferences, update_preferences
 from knowledge_tracker.preferences.scorer import score_and_filter
 from knowledge_tracker.obsidian.writer import write_digest, write_deepdive
@@ -125,8 +128,7 @@ def run_daily(cfg: dict) -> None:
     threshold = cfg.get("dedup_similarity_threshold", 0.85)
 
     client = anthropic.Anthropic()
-    from sentence_transformers import SentenceTransformer
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    embedder = _get_model()
 
     for topic in cfg["topics"]:
         slug = topic["slug"]
@@ -147,7 +149,7 @@ def run_daily(cfg: dict) -> None:
         # Generate digest via Claude
         result = digest_gen.generate(
             client, model=model, topic=topic,
-            articles=articles, date=today, sources_fetched=fetched,
+            articles=articles, prefs=prefs, date=today, sources_fetched=fetched,
         )
 
         # Write to vault

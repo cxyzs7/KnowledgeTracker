@@ -14,12 +14,15 @@ def call_with_retry(
     tools: list[dict],
     messages: list[dict],
     tool_choice: dict | None = None,
+    system: str | None = None,
 ) -> anthropic.types.Message:
     """Call Claude API with exponential backoff on 429/500 errors."""
     last_exc: Exception | None = None
     kwargs = dict(model=model, max_tokens=max_tokens, tools=tools, messages=messages)
     if tool_choice:
         kwargs["tool_choice"] = tool_choice
+    if system:
+        kwargs["system"] = system
 
     for i, backoff in enumerate([0] + BACKOFF):
         if backoff:

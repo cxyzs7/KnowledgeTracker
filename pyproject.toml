@@ -15,6 +15,8 @@ dependencies = [
     "torch",
     "scikit-learn",
     "apscheduler",
+    "python-dotenv",
+    "requests",
 ]
 
 [project.scripts]

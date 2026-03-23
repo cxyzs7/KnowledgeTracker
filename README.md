@@ -10,7 +10,7 @@ A personal knowledge pipeline that generates daily topic digests and weekly deep
 
 - Python 3.12+ and [uv](https://docs.astral.sh/uv/)
 - An [Anthropic API key](https://console.anthropic.com/)
-- A [Tavily](https://tavily.com/) or [Exa](https://exa.ai/) API key for web search
+- A [Tavily](https://tavily.com/) API key for web search
 - An Obsidian vault backed by a GitHub repo
 
 ## Installation
@@ -37,7 +37,7 @@ obsidian_vault:
   preferences_file: "preferences.md"
 
 claude_model: "claude-sonnet-4-6"
-web_search_provider: "tavily"   # or "exa"
+web_search_provider: "tavily"
 max_articles_per_digest: 20
 max_articles_deepdive: 15
 dedup_similarity_threshold: 0.85
@@ -70,8 +70,7 @@ Fill in `.env` (copied from `.env.example`):
 | Variable | Required | Notes |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | |
-| `TAVILY_API_KEY` | Yes (or EXA) | Set `web_search_provider: tavily` in config |
-| `EXA_API_KEY` | Yes (or Tavily) | Set `web_search_provider: exa` in config |
+| `TAVILY_API_KEY` | Yes | |
 | `BLUESKY_HANDLE` | No | Bluesky source skipped if absent |
 | `BLUESKY_APP_PASSWORD` | No | Bluesky source skipped if absent |
 
@@ -111,7 +110,7 @@ In this repo: Settings → Secrets and variables → Actions → New repository 
 | `VAULT_DEPLOY_KEY` | Private key from above |
 | `VAULT_REPO` | SSH URL of your vault, e.g. `git@github.com:you/vault.git` |
 | `ANTHROPIC_API_KEY` | |
-| `TAVILY_API_KEY` | (or `EXA_API_KEY`) |
+| `TAVILY_API_KEY` | |
 | `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional |
 
 ## Day-to-day usage

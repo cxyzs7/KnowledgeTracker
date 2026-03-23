@@ -1,5 +1,5 @@
-import respx
-import httpx
+import time
+from unittest.mock import patch, MagicMock
 from knowledge_tracker.sources.reddit import fetch
 
 MOCK_RESPONSE = {
@@ -7,32 +7,33 @@ MOCK_RESPONSE = {
         "children": [
             {"data": {
                 "title": "RAG pipelines",
-                "url": "https://example.com/rag",
+                "permalink": "/r/MachineLearning/comments/abc/rag_pipelines/",
                 "score": 400,
                 "author": "bob",
                 "selftext": "",
+                "created_utc": time.time(),  # now — passes 24h cutoff
             }}
         ]
     }
 }
 
 
-@respx.mock
-def test_fetch_returns_articles():
-    respx.get("https://www.reddit.com/r/MachineLearning/hot.json").mock(
-        return_value=httpx.Response(200, json=MOCK_RESPONSE)
-    )
+@patch("knowledge_tracker.sources.reddit.requests.get")
+def test_fetch_returns_articles(mock_get):
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = MOCK_RESPONSE
+    mock_get.return_value = mock_resp
+
     articles = fetch(subreddits=["MachineLearning"], limit=10)
     assert len(articles) == 1
     assert articles[0].title == "RAG pipelines"
     assert articles[0].source == "reddit"
     assert articles[0].score == 400
+    assert "reddit.com" in articles[0].url
 
 
-@respx.mock
-def test_fetch_returns_empty_on_failure():
-    respx.get("https://www.reddit.com/r/MachineLearning/hot.json").mock(
-        return_value=httpx.Response(429)
-    )
+@patch("knowledge_tracker.sources.reddit.requests.get")
+def test_fetch_returns_empty_on_failure(mock_get):
+    mock_get.side_effect = Exception("connection error")
     articles = fetch(subreddits=["MachineLearning"])
     assert articles == []

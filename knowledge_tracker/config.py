@@ -28,11 +28,9 @@ def load_config(path: str, validate_env: bool = False) -> dict:
 
 def _validate_env(cfg: dict) -> None:
     provider = cfg.get("web_search_provider", "tavily")
-    key_map = {"tavily": "TAVILY_API_KEY", "exa": "EXA_API_KEY"}
-    key = key_map.get(provider)
-    if key and not os.environ.get(key):
+    if provider == "tavily" and not os.environ.get("TAVILY_API_KEY"):
         raise EnvironmentError(
-            f"web_search_provider is '{provider}' but {key} env var is not set"
+            "web_search_provider is 'tavily' but TAVILY_API_KEY env var is not set"
         )
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise EnvironmentError("ANTHROPIC_API_KEY env var is not set")

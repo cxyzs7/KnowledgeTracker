@@ -21,7 +21,6 @@ def test_load_config_fails_fast_missing_search_key(monkeypatch):
     """web_search_provider=tavily with no TAVILY_API_KEY env var raises at startup."""
     import os, pytest
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-    monkeypatch.delenv("EXA_API_KEY", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     with pytest.raises(EnvironmentError, match="TAVILY_API_KEY"):
         load_config("config/topics.yaml", validate_env=True)

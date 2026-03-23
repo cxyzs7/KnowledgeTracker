@@ -20,16 +20,16 @@ def fetch(hashtags: list[str], accounts: list[str],
     for tag in hashtags:
         try:
             resp = client.app.bsky.feed.search_posts({"q": tag, "limit": 25})
-            for item in resp.feed:
-                text = item.post.record.text
+            for item in resp.posts:
+                text = item.record.text
                 urls = URL_RE.findall(text)
-                url = urls[0] if urls else f"https://bsky.app/profile/{item.post.author.handle}"
+                url = urls[0] if urls else f"https://bsky.app/profile/{item.author.handle}"
                 articles.append(Article(
                     url=url,
                     title=text[:100],
                     description=text,
                     source="bluesky",
-                    author=item.post.author.handle,
+                    author=item.author.handle,
                     score=0,
                 ))
         except Exception as e:
