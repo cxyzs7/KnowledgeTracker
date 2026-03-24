@@ -7,13 +7,14 @@ on:
 
 jobs:
   deepdive:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout KnowledgeTracker repo
         uses: actions/checkout@v4
 
       - name: Checkout Obsidian vault
         run: |
+          rm -rf vault
           git clone https://x-access-token:${{ secrets.VAULT_TOKEN }}@github.com/${{ secrets.VAULT_REPO }} vault
           echo "VAULT_PATH=$(pwd)/vault" >> $GITHUB_ENV
 
