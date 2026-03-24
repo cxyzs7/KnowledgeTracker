@@ -40,7 +40,6 @@ jobs:
           cd vault
           git config user.email "actions@github.com"
           git config user.name "KnowledgeTracker Bot"
-          git config core.fileMode false
           git pull --rebase origin main
           git add .
           git diff --cached --quiet || git commit -m "chore: daily digest $(date -u +%Y-%m-%d)"
