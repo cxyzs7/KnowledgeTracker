@@ -23,7 +23,7 @@ from knowledge_tracker.dedup import url_dedup, semantic_dedup, _get_model
 from knowledge_tracker.preferences.store import load_preferences, update_preferences
 from knowledge_tracker.preferences.scorer import score_and_filter
 from knowledge_tracker.obsidian.writer import write_digest, write_deepdive
-from knowledge_tracker.obsidian.reader import parse_week_digests
+from knowledge_tracker.obsidian.reader import parse_week_digests, parse_seen_urls
 from knowledge_tracker.generators import digest as digest_gen
 from knowledge_tracker.generators import deepdive as deepdive_gen
 from knowledge_tracker import sources
@@ -139,6 +139,13 @@ def run_daily(cfg: dict) -> None:
 
         # Deduplicate
         articles = url_dedup(raw_articles)
+
+        # Filter out articles already seen in recent digests
+        digest_dir = os.path.join(vault_path, digests_folder, slug)
+        seen_urls = parse_seen_urls(digest_dir, lookback_days=cfg.get("dedup_lookback_days", 7))
+        articles = [a for a in articles if a.url not in seen_urls]
+        logger.info("%d articles after cross-day dedup (%d seen in recent digests)", len(articles), len(seen_urls))
+
         articles = semantic_dedup(articles, threshold=threshold)
 
         # Score and filter

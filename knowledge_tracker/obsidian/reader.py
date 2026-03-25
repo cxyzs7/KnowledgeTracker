@@ -58,6 +58,31 @@ def parse_digest_file(filepath: str, flag_tag: str = "#deepdive") -> tuple[list[
     return flagged, manual
 
 
+def parse_seen_urls(digest_dir: str, lookback_days: int = 7) -> set[str]:
+    """Return all URLs found in digest files written within the last lookback_days."""
+    from datetime import date, timedelta
+    cutoff = date.today() - timedelta(days=lookback_days)
+    seen: set[str] = set()
+    try:
+        files = list(Path(digest_dir).glob("*.md"))
+    except Exception:
+        return seen
+    for f in files:
+        try:
+            file_date = date.fromisoformat(f.stem)
+        except ValueError:
+            continue
+        if file_date <= cutoff:
+            continue
+        try:
+            content = f.read_text()
+        except Exception:
+            continue
+        for _, url in MD_LINK_RE.findall(content):
+            seen.add(url)
+    return seen
+
+
 def parse_week_digests(
     digest_dir: str,
     week_start: str,

@@ -93,6 +93,48 @@ def test_run_daily_creates_digest(cfg, vault):
     assert "## Manual Links" in content
 
 
+def test_run_daily_filters_articles_seen_in_recent_digest(cfg, vault):
+    """Articles whose URLs already appeared in a recent digest should be excluded."""
+    import datetime
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    digest_dir = Path(vault) / "Digests" / "ai_engineering"
+    # Seed yesterday's digest with one of the SAMPLE_ARTICLES URLs
+    (digest_dir / f"{yesterday}.md").write_text(
+        f"---\ndate: {yesterday}\n---\n\n"
+        "**RAG is Great** — summary. [hackernews](https://example.com/rag)\n\n"
+        "## Manual Links\n-\n"
+    )
+
+    mock_embeddings = np.array([[0.1] * 384] * len(SAMPLE_ARTICLES))
+    mock_embedder = MagicMock()
+    mock_embedder.encode.return_value = mock_embeddings
+
+    captured = {}
+
+    def capture_generate(client, *, model, topic, articles, prefs, date, sources_fetched):
+        captured["articles"] = articles
+        return MOCK_DIGEST_RESULT
+
+    with (
+        patch.object(run_module, "_fetch_all_sources", return_value=(SAMPLE_ARTICLES, ["hackernews"], [])),
+        patch.object(run_module.digest_gen, "generate", side_effect=capture_generate),
+        patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
+        patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
+        patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
+        patch("anthropic.Anthropic"),
+        patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}),
+    ):
+        run_module.run_daily(cfg)
+
+    passed_urls = {a.url for a in captured.get("articles", [])}
+    assert "https://example.com/rag" not in passed_urls, (
+        "URL from yesterday's digest should have been filtered out"
+    )
+    assert "https://example.com/agents" in passed_urls, (
+        "New URL not in recent digests should still be included"
+    )
+
+
 def test_run_weekly_creates_deepdive(cfg, vault):
     """run_weekly should produce a deep dive markdown file when flagged articles exist."""
     import datetime, shutil
