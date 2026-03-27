@@ -1,0 +1,101 @@
+# config/builders.yaml
+# Global curated builder list applied across all topics.
+# Twitter and YouTube sources only activate when credentials are set.
+
+twitter:
+  accounts:
+    - handle: karpathy
+      id: "33836629"
+      name: Andrej Karpathy
+    - handle: sama
+      id: "12631042"
+      name: Sam Altman
+    - handle: swyx
+      id: "549057890"
+      name: swyx
+    - handle: rauchg
+      id: "18988"
+      name: Guillermo Rauch
+    - handle: petergyang
+      id: "14226776"
+      name: Peter Yang
+    - handle: levie
+      id: "7517999"
+      name: Aaron Levie
+    - handle: AndrewYNg
+      id: "15358364"
+      name: Andrew Ng
+    - handle: emollick
+      id: "24733248"
+      name: Ethan Mollick
+    - handle: kanjun
+      id: "118557511"
+      name: Kanjun Qiu
+    - handle: alexandr_wang
+      id: "3336027"
+      name: Alexandr Wang
+    - handle: GaryMarcus
+      id: "17632388"
+      name: Gary Marcus
+    - handle: ylecun
+      id: "226744807"
+      name: Yann LeCun
+    - handle: demishassabis
+      id: "3347058"
+      name: Demis Hassabis
+    - handle: drfeifei
+      id: "1551395060"
+      name: Fei-Fei Li
+    - handle: hardmaru
+      id: "26809117"
+      name: David Ha
+    - handle: ilyasut
+      id: "1234817"
+      name: Ilya Sutskever
+    - handle: gdb
+      id: "29883836"
+      name: Greg Brockman
+    - handle: miramurati
+      id: "1098503768"
+      name: Mira Murati
+    - handle: danielgross
+      id: "7893532"
+      name: Daniel Gross
+    - handle: benedictevans
+      id: "35609905"
+      name: Benedict Evans
+    - handle: naval
+      id: "745273"
+      name: Naval Ravikant
+
+youtube:
+  channels:
+    - id: UCXZCJLdBC09xxGZ6gcdrc6A
+      name: Latent Space
+    - id: UCqd7KBQN0XuEFKCHOTKiHtw
+      name: No Priors
+    - id: UCCezIgC97LvombAt4RHs_7w
+      name: Lex Fridman
+    - id: UCbmNph6atAoGfqLoCL_duAg
+      name: Andrej Karpathy
+    - id: UCGq-a57w-aPwyi3pW7XLiHw
+      name: Machine Learning Street Talk
+
+blogs:
+  feeds:
+    - url: https://www.anthropic.com/news.rss
+      name: Anthropic News
+    - url: https://openai.com/blog/rss
+      name: OpenAI Blog
+    - url: https://karpathy.github.io/feed.xml
+      name: Andrej Karpathy
+    - url: https://eugeneyan.com/rss.xml
+      name: Eugene Yan
+    - url: https://lilianweng.github.io/index.xml
+      name: Lilian Weng
+    - url: https://simonwillison.net/atom/everything/
+      name: Simon Willison
+    - url: https://www.interconnects.ai/feed
+      name: Interconnects (Nathan Lambert)
+    - url: https://hamel.dev/rss.xml
+      name: Hamel Husain

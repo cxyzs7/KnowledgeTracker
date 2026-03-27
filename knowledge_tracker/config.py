@@ -34,3 +34,12 @@ def _validate_env(cfg: dict) -> None:
         )
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise EnvironmentError("ANTHROPIC_API_KEY env var is not set")
+
+
+def load_builders_config(path: str = "config/builders.yaml") -> dict:
+    """Load the curated builder list. Returns {} if the file does not exist."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    with open(p) as f:
+        return yaml.safe_load(f) or {}
