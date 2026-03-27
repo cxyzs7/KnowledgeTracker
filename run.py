@@ -222,7 +222,6 @@ def run_weekly(cfg: dict) -> None:
     max_articles = cfg.get("max_articles_deepdive", 15)
 
     client = anthropic.Anthropic()
-    builders_cfg = _kt_config.load_builders_config()  # noqa: F841 — not used in weekly pipeline, kept for symmetry
 
     for topic in cfg["topics"]:
         slug = topic["slug"]

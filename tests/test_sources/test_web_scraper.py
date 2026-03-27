@@ -31,7 +31,7 @@ def test_fetch_feeds_parses_atom():
 
     assert len(articles) == 1
     assert articles[0].title == "Test Article"
-    assert articles[0].source == "feed"
+    assert articles[0].source == "feeds"
 
 
 @respx.mock

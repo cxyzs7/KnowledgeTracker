@@ -17,7 +17,7 @@ def fetch_feeds(feed_urls: list[str]) -> list[Article]:
                     url=entry.get("link", ""),
                     title=entry.get("title", ""),
                     description=entry.get("summary", "")[:500],
-                    source="feed",
+                    source="feeds",
                     author=entry.get("author"),
                     score=0,
                 ))
