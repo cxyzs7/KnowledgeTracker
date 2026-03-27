@@ -5,4 +5,6 @@ from knowledge_tracker.sources import (
     web_search,
     github_trending,
     bluesky,
+    youtube,
+    twitter,
 )
