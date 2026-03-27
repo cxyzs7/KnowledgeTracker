@@ -76,6 +76,37 @@ Fill in `.env` (copied from `.env.example`):
 
 The app fails at startup with a clear error if a required key is missing.
 
+## Optional Sources
+
+By default, KnowledgeTracker fetches from Hacker News, Reddit, RSS feeds, GitHub Trending, Bluesky, and web search. Two additional sources can be enabled by setting API credentials.
+
+### YouTube & Podcasts
+
+Fetches transcripts from YouTube channels listed in `config/builders.yaml` via the [Supadata API](https://supadata.ai).
+
+1. Get a Supadata API key at [supadata.ai](https://supadata.ai)
+2. Add to your `.env`:
+   ```
+   SUPADATA_API_KEY=your_key_here
+   ```
+3. Edit `config/builders.yaml` to add or remove channels under `youtube.channels`. Each entry needs an `id` (YouTube channel ID) and `name`.
+
+When `SUPADATA_API_KEY` is not set, the YouTube source is silently skipped.
+
+### Twitter / X
+
+Fetches recent tweets from curated builder accounts listed in `config/builders.yaml` via the [X API v2](https://developer.twitter.com/en/docs/twitter-api).
+
+1. Apply for a free X Developer account at [developer.twitter.com](https://developer.twitter.com)
+2. Create a project and app, then copy the Bearer Token
+3. Add to your `.env`:
+   ```
+   X_BEARER_TOKEN=your_bearer_token_here
+   ```
+4. Edit `config/builders.yaml` to add or remove accounts under `twitter.accounts`. Each entry needs a `handle`, numeric `id`, and `name`. To find a user's numeric ID, use [tweeterid.com](https://tweeterid.com).
+
+When `X_BEARER_TOKEN` is not set, the Twitter source is silently skipped.
+
 ## Running locally
 
 ```bash
