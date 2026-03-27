@@ -45,6 +45,8 @@ prompts/
 
 `deepdive.py` similarly loads `prompts/deepdive_analyse.md` and `prompts/deepdive_synthesise.md` instead of hardcoded strings.
 
+**Missing file behavior:** If any prompt file is absent, the loader raises `FileNotFoundError` immediately. Silent fallback to hardcoded strings is not permitted — a missing prompt file is a misconfiguration that should fail loudly.
+
 ### Content improvements from follow-builders
 
 The existing prompts are general-purpose. Per-source templates add precision:
@@ -61,7 +63,7 @@ The existing prompts are general-purpose. Per-source templates add precision:
 
 - API: Supadata (`https://api.supadata.ai/v1/youtube/transcript`)
 - Credential: `SUPADATA_API_KEY` env var — returns `[]` silently if unset
-- Channel list: from `config/builders.yaml` (`youtube.channels`) or per-topic override in `topics.yaml`
+- Channel list: from `config/builders.yaml` (`youtube.channels`) only — no per-topic override
 - Lookback: 72 hours
 - Output: `Article` with title, channel URL, transcript as description (first 3000 chars)
 - Integrates into existing pipeline unchanged (url_dedup → semantic_dedup → score_and_filter)
@@ -103,12 +105,12 @@ twitter:
       id: "12631042"
       name: Sam Altman
     - handle: swyx
-      id: "NNN"
+      id: "NNN"        # real IDs populated from follow-builders default-sources.json at implementation time
       name: swyx
     - handle: rauchg
       id: "NNN"
       name: Guillermo Rauch
-    # ... (25 accounts from follow-builders default-sources.json)
+    # ... full 25-account list from follow-builders default-sources.json
 
 youtube:
   channels:
