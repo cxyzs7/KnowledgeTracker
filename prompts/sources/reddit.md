@@ -1,0 +1,1 @@
+For Reddit posts: note the subreddit as context for the audience. Prioritise posts with substantive text content or links to primary sources. A high upvote score signals broad community consensus; a controversial post signals active debate worth surfacing.

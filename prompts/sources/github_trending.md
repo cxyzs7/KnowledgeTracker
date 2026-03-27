@@ -1,0 +1,1 @@
+For GitHub Trending repositories: explain what the project does and why it is gaining traction now. Include the primary tech stack if relevant. Omit projects trending purely due to social virality with no technical substance.

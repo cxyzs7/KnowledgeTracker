@@ -1,0 +1,1 @@
+For Bluesky posts: introduce the author by full name and role/company — do not use @ handles in the digest body. Skip promotional posts. 2–4 sentences per person. Lead with bold predictions, contrarian takes, or concrete technical observations. Name any tools or demos mentioned with links. Focus on original opinions, not commentary on others' work.

@@ -1,0 +1,1 @@
+For web search results: treat as supplementary context. Prefer primary sources (official blogs, papers, documentation) over aggregators or reposts. If a search result covers a story already present from another source, merge them rather than listing separately.

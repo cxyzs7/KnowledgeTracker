@@ -1,0 +1,1 @@
+For HackerNews items: prioritise stories with substantive technical content or high comment signal (active discussion indicates significance). Lead with the core finding or announcement. When the article itself is thin, note that the HN discussion may be the value.
