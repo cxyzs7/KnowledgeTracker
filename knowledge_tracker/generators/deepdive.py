@@ -2,6 +2,7 @@ import logging
 import anthropic
 from knowledge_tracker.models import Article
 from knowledge_tracker.claude_client import call_with_retry
+from knowledge_tracker.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -52,15 +53,14 @@ URL: {article.url}
 Content:
 {content[:3000]}
 
-Topic keywords: {', '.join(topic.get('keywords', []))}
-
-Provide a structured analysis using the tool."""
+Topic keywords: {', '.join(topic.get('keywords', []))}"""
 
     try:
         response = call_with_retry(
             client,
             model=model,
             max_tokens=2048,
+            system=load_prompt("deepdive_analyse"),
             tools=[PHASE1_TOOL],
             messages=[{"role": "user", "content": prompt}],
             tool_choice={"type": "tool", "name": "analyse_article"},
@@ -103,19 +103,14 @@ Here are the per-article analyses:
 
 {analyses_text}
 
-Write a 400–600 word synthesis that:
-1. Identifies the major themes and trends across these articles
-2. Highlights the most important insights and their practical implications
-3. Suggests 3–5 concrete action steps the reader can take this week
-4. Notes any open questions or areas to watch
+Suggest 3–5 concrete action steps the reader can take this week. Note open questions or areas to watch."""
 
-Write in clear, direct prose. Start directly with the synthesis (no heading needed).
-"""
     try:
         response = call_with_retry(
             client,
             model=model,
             max_tokens=2048,
+            system=load_prompt("deepdive_synthesise"),
             tools=[],
             messages=[{"role": "user", "content": prompt}],
         )
