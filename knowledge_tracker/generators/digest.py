@@ -2,15 +2,9 @@ import logging
 import anthropic
 from knowledge_tracker.models import Article
 from knowledge_tracker.claude_client import call_with_retry
+from knowledge_tracker.prompt_loader import load_prompt, load_source_prompt
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are a senior engineer curating a daily digest for a developer who wants \
-high-signal, actionable content. Your priorities:
-- Avoid hype and marketing language. Favour depth and practicality.
-- If the same story appears across multiple sources, merge them into one entry and list all relevant links.
-- Omit sections that have nothing worth including today.
-- Quality over quantity: a tight digest of 10 great items beats 30 mediocre ones."""
 
 DIGEST_TOOL = {
     "name": "generate_digest",
@@ -42,6 +36,21 @@ DIGEST_TOOL = {
 }
 
 
+def _build_system_prompt(articles: list[Article]) -> str:
+    """Load base digest prompt and append per-source instructions for sources present."""
+    system = load_prompt("digest")
+    present_sources = sorted({a.source for a in articles})
+    source_sections = []
+    for source in present_sources:
+        src_prompt = load_source_prompt(source)
+        if src_prompt:
+            label = source.replace("_", " ").title()
+            source_sections.append(f"### {label}\n{src_prompt}")
+    if source_sections:
+        system += "\n\n## Per-Source Instructions\n\n" + "\n\n".join(source_sections)
+    return system
+
+
 def generate(
     client: anthropic.Anthropic,
     *,
@@ -54,8 +63,9 @@ def generate(
 ) -> dict:
     """Generate a daily digest for one topic. Returns dict with body and metadata."""
     if not articles:
-        body = "*No articles found today.*\n"
-        return {"body": body, "sources_fetched": sources_fetched, "sources_failed": []}
+        return {"body": "*No articles found today.*\n", "sources_fetched": sources_fetched, "sources_failed": []}
+
+    system = _build_system_prompt(articles)
 
     articles_text = "\n\n".join(
         f"**[{i+1}] [{a.title}]({a.url})**\n"
@@ -64,7 +74,6 @@ def generate(
         for i, a in enumerate(articles)
     )
 
-    # Build preference context from stored preferences
     prefs = prefs or {}
     pref_lines = []
     if prefs.get("positive_keywords"):
@@ -95,7 +104,7 @@ Instructions:
         client,
         model=model,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
+        system=system,
         tools=[DIGEST_TOOL],
         messages=[{"role": "user", "content": prompt}],
         tool_choice={"type": "tool", "name": "generate_digest"},
