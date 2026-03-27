@@ -2,7 +2,7 @@
 
 A personal knowledge pipeline that generates daily topic digests and weekly deep dives, saved as markdown to your Obsidian vault.
 
-- **Daily digest** — fetches articles from Hacker News, Reddit, RSS feeds, GitHub Trending, Bluesky, and web search; deduplicates and scores by relevance; generates a markdown summary via Claude.
+- **Daily digest** — fetches articles from Hacker News, Reddit, RSS feeds, GitHub Trending, and web search; deduplicates and scores by relevance; generates a markdown summary via Claude. Optional credential-gated sources (Bluesky, YouTube, Twitter) are silently skipped when credentials are absent.
 - **Weekly deep dive** — reads articles you flagged `#deepdive` during the week, performs per-article research expansion via Claude, synthesises across all of them, and writes a comprehensive report.
 - **Preference learning** — your flagged articles automatically improve future scoring. Tune further by editing `preferences.md` in your vault.
 
@@ -70,42 +70,21 @@ Fill in `.env` (copied from `.env.example`):
 | Variable | Required | Notes |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | |
-| `TAVILY_API_KEY` | Yes | |
+| `TAVILY_API_KEY` | Yes | Required if `web_search_provider` is `tavily` (the default) |
 | `BLUESKY_HANDLE` | No | Bluesky source skipped if absent |
 | `BLUESKY_APP_PASSWORD` | No | Bluesky source skipped if absent |
+| `SUPADATA_API_KEY` | No | YouTube source skipped if absent |
+| `X_BEARER_TOKEN` | No | Twitter source skipped if absent |
 
-The app fails at startup with a clear error if a required key is missing.
+Required keys cause a startup error if missing. All other sources are silently skipped when their credentials are absent.
 
-## Optional Sources
+### Credential-gated sources
 
-By default, KnowledgeTracker fetches from Hacker News, Reddit, RSS feeds, GitHub Trending, Bluesky, and web search. Two additional sources can be enabled by setting API credentials.
+**Bluesky** — configure hashtags and accounts per topic in `config/topics.yaml` under `sources.bluesky`.
 
-### YouTube & Podcasts
+**YouTube & Podcasts** — fetches transcripts via the [Supadata API](https://supadata.ai). Get a key at [supadata.ai](https://supadata.ai). Edit `config/builders.yaml` to add or remove channels under `youtube.channels` (each entry needs an `id` and `name`).
 
-Fetches transcripts from YouTube channels listed in `config/builders.yaml` via the [Supadata API](https://supadata.ai).
-
-1. Get a Supadata API key at [supadata.ai](https://supadata.ai)
-2. Add to your `.env`:
-   ```
-   SUPADATA_API_KEY=your_key_here
-   ```
-3. Edit `config/builders.yaml` to add or remove channels under `youtube.channels`. Each entry needs an `id` (YouTube channel ID) and `name`.
-
-When `SUPADATA_API_KEY` is not set, the YouTube source is silently skipped.
-
-### Twitter / X
-
-Fetches recent tweets from curated builder accounts listed in `config/builders.yaml` via the [X API v2](https://developer.twitter.com/en/docs/twitter-api).
-
-1. Apply for a free X Developer account at [developer.twitter.com](https://developer.twitter.com)
-2. Create a project and app, then copy the Bearer Token
-3. Add to your `.env`:
-   ```
-   X_BEARER_TOKEN=your_bearer_token_here
-   ```
-4. Edit `config/builders.yaml` to add or remove accounts under `twitter.accounts`. Each entry needs a `handle`, numeric `id`, and `name`. To find a user's numeric ID, use [tweeterid.com](https://tweeterid.com).
-
-When `X_BEARER_TOKEN` is not set, the Twitter source is silently skipped.
+**Twitter / X** — fetches recent tweets via the [X API v2](https://developer.twitter.com/en/docs/twitter-api). Apply for a free X Developer account, create a project and app, then copy the Bearer Token. Edit `config/builders.yaml` to add or remove accounts under `twitter.accounts` (each entry needs a `handle`, numeric `id`, and `name` — use [tweeterid.com](https://tweeterid.com) to find numeric IDs).
 
 ## Running locally
 
@@ -140,7 +119,9 @@ In this repo: Settings → Secrets and variables → Actions → New repository 
 | `VAULT_REPO` | `owner/repo` of your vault, e.g. `cxyzs7/Vault` |
 | `ANTHROPIC_API_KEY` | |
 | `TAVILY_API_KEY` | |
-| `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional |
+| `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | Optional — Bluesky source skipped if absent |
+| `SUPADATA_API_KEY` | Optional — YouTube source skipped if absent |
+| `X_BEARER_TOKEN` | Optional — Twitter source skipped if absent |
 
 ## Day-to-day usage
 
