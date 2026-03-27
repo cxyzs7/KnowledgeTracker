@@ -18,6 +18,7 @@ from datetime import date, timedelta
 import anthropic
 
 from knowledge_tracker.config import load_config
+import knowledge_tracker.config as _kt_config
 from knowledge_tracker.models import Article
 from knowledge_tracker.dedup import url_dedup, semantic_dedup, _get_model
 from knowledge_tracker.preferences.store import load_preferences, update_preferences
@@ -32,7 +33,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
-def _fetch_all_sources(topic: dict, cfg: dict) -> tuple[list[Article], list[str], list[str]]:
+def _fetch_all_sources(topic: dict, cfg: dict, builders_cfg: dict | None = None) -> tuple[list[Article], list[str], list[str]]:
     """Fetch from all configured sources for a topic. Returns (articles, fetched, failed)."""
     topic_sources = topic.get("sources", {})
     fetched, failed = [], []
@@ -61,11 +62,13 @@ def _fetch_all_sources(topic: dict, cfg: dict) -> tuple[list[Article], list[str]
                 logger.warning("Reddit fetch failed: %s", e)
                 failed.append("reddit")
 
-    # Feeds (RSS/Atom)
-    feeds = topic_sources.get("feeds", [])
-    if feeds:
+    # Feeds (topic RSS feeds + global builder blog feeds merged)
+    topic_feeds = topic_sources.get("feeds", [])
+    builder_feed_urls = [f["url"] for f in (builders_cfg or {}).get("blogs", {}).get("feeds", [])]
+    all_feeds = topic_feeds + builder_feed_urls
+    if all_feeds:
         try:
-            arts = sources.web_scraper.fetch_feeds(feeds)
+            arts = sources.web_scraper.fetch_feeds(all_feeds)
             all_articles.extend(arts)
             fetched.append("feeds")
         except Exception as e:
@@ -115,6 +118,30 @@ def _fetch_all_sources(topic: dict, cfg: dict) -> tuple[list[Article], list[str]
             logger.warning("Web search failed: %s", e)
             failed.append("web_search")
 
+    # YouTube (optional — requires SUPADATA_API_KEY)
+    youtube_channels = (builders_cfg or {}).get("youtube", {}).get("channels", [])
+    if youtube_channels:
+        try:
+            arts = sources.youtube.fetch(youtube_channels)
+            if arts:
+                all_articles.extend(arts)
+                fetched.append("youtube")
+        except Exception as e:
+            logger.warning("YouTube fetch failed: %s", e)
+            failed.append("youtube")
+
+    # Twitter/X (optional — requires X_BEARER_TOKEN)
+    twitter_accounts = (builders_cfg or {}).get("twitter", {}).get("accounts", [])
+    if twitter_accounts:
+        try:
+            arts = sources.twitter.fetch(twitter_accounts)
+            if arts:
+                all_articles.extend(arts)
+                fetched.append("twitter")
+        except Exception as e:
+            logger.warning("Twitter fetch failed: %s", e)
+            failed.append("twitter")
+
     return all_articles, fetched, failed
 
 
@@ -129,12 +156,13 @@ def run_daily(cfg: dict) -> None:
 
     client = anthropic.Anthropic()
     embedder = _get_model()
+    builders_cfg = _kt_config.load_builders_config()
 
     for topic in cfg["topics"]:
         slug = topic["slug"]
         logger.info("Processing topic: %s", topic["name"])
 
-        raw_articles, fetched, failed = _fetch_all_sources(topic, cfg)
+        raw_articles, fetched, failed = _fetch_all_sources(topic, cfg, builders_cfg)
         logger.info("Fetched %d raw articles from %s", len(raw_articles), fetched)
 
         # Deduplicate
@@ -194,6 +222,7 @@ def run_weekly(cfg: dict) -> None:
     max_articles = cfg.get("max_articles_deepdive", 15)
 
     client = anthropic.Anthropic()
+    builders_cfg = _kt_config.load_builders_config()  # noqa: F841 — not used in weekly pipeline, kept for symmetry
 
     for topic in cfg["topics"]:
         slug = topic["slug"]

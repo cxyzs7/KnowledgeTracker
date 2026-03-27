@@ -172,3 +172,40 @@ def test_run_weekly_creates_deepdive(cfg, vault):
     assert deepdive_path.exists(), f"Expected deep dive at {deepdive_path}"
     content = deepdive_path.read_text()
     assert "RAG is Great" in content
+
+
+def test_builder_feeds_merged_into_fetch(cfg, vault):
+    """Builder blog feeds from builders.yaml are included in the feeds fetch."""
+    mock_embeddings = np.array([[0.1] * 384] * 2)
+    mock_embedder = MagicMock()
+    mock_embedder.encode.return_value = mock_embeddings
+
+    builders_cfg = {
+        "blogs": {
+            "feeds": [
+                {"url": "https://eugeneyan.com/rss.xml", "name": "Eugene Yan"},
+            ]
+        }
+    }
+
+    captured_feeds = {}
+
+    def capture_fetch_feeds(feeds):
+        captured_feeds["feeds"] = feeds
+        return []
+
+    with (
+        patch("knowledge_tracker.config.load_builders_config", return_value=builders_cfg),
+        patch.object(run_module.sources.web_scraper, "fetch_feeds", side_effect=capture_fetch_feeds),
+        patch("knowledge_tracker.generators.digest.call_with_retry", return_value=MOCK_CLAUDE_RESPONSE),
+        patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
+        patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
+        patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
+        patch("anthropic.Anthropic"),
+        patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}),
+    ):
+        cfg["topics"][0]["sources"] = {"feeds": ["https://existing.com/rss.xml"]}
+        run_module.run_daily(cfg)
+
+    assert "https://eugeneyan.com/rss.xml" in captured_feeds.get("feeds", [])
+    assert "https://existing.com/rss.xml" in captured_feeds.get("feeds", [])
