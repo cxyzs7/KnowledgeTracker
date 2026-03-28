@@ -13,18 +13,26 @@ _EVALUATE_TOOL = {
         "properties": {
             "quality_groundedness": {
                 "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
                 "description": "1-5: every claim in the digest traces back to a provided article",
             },
             "quality_specificity": {
                 "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
                 "description": "1-5: entries name concrete tools, people, or numbers rather than vague summaries",
             },
             "quality_coverage": {
                 "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
                 "description": "1-5: the most significant articles are represented with no glaring omissions",
             },
             "quality_format": {
                 "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
                 "description": "1-5: highlights section present, thematic sections used correctly, entries well-formed",
             },
             "quality_rationale": {
@@ -52,8 +60,10 @@ def evaluate(
 ) -> dict:
     """Evaluate digest quality against source articles. Returns score dict or {} on failure."""
     try:
+        if not articles or not digest_body:
+            return {}
         articles_text = "\n\n".join(
-            f"[{i + 1}] {a.title} — {a.description[:200]}"
+            f"[{i + 1}] {a.title} — {(a.description or '')[:200]}"
             for i, a in enumerate(articles)
         )
         prompt = (

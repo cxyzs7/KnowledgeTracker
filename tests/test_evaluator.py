@@ -49,3 +49,27 @@ def test_evaluate_returns_empty_dict_on_api_failure():
             digest_body="### Highlights\n- RAG is useful.",
         )
     assert result == {}
+
+
+def test_evaluate_passes_articles_and_digest_to_claude():
+    captured = {}
+
+    def capture_call(client, **kwargs):
+        captured["messages"] = kwargs.get("messages", [])
+        captured["tool_choice"] = kwargs.get("tool_choice")
+        captured["system"] = kwargs.get("system", "")
+        return MOCK_EVAL_RESPONSE
+
+    with patch("knowledge_tracker.generators.evaluator.call_with_retry", side_effect=capture_call):
+        evaluate(
+            MagicMock(),
+            model="claude-sonnet-4-6",
+            articles=[SAMPLE_ARTICLE],
+            digest_body="Digest content here.",
+        )
+
+    prompt_text = captured["messages"][0]["content"]
+    assert "RAG Overview" in prompt_text          # article title appears in prompt
+    assert "Digest content here." in prompt_text  # digest body appears in prompt
+    assert captured["tool_choice"] == {"type": "tool", "name": "evaluate_digest"}
+    assert "observe" in captured["system"]        # system prompt is forwarded
