@@ -236,6 +236,7 @@ def test_builder_feeds_merged_into_fetch(cfg, vault):
         patch("knowledge_tracker.config.load_builders_config", return_value=builders_cfg),
         patch.object(run_module.sources.web_scraper, "fetch_feeds", side_effect=capture_fetch_feeds),
         patch("knowledge_tracker.generators.digest.call_with_retry", return_value=MOCK_CLAUDE_RESPONSE),
+        patch("knowledge_tracker.generators.evaluator.call_with_retry", return_value=MagicMock(content=[])),
         patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
         patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
         patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
