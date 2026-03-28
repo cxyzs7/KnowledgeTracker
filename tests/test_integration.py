@@ -174,6 +174,42 @@ def test_run_weekly_creates_deepdive(cfg, vault):
     assert "RAG is Great" in content
 
 
+def test_run_daily_writes_quality_scores_to_frontmatter(cfg, vault):
+    """Quality scores returned by evaluator.evaluate appear in the digest frontmatter."""
+    mock_embeddings = np.array([[0.1] * 384] * len(SAMPLE_ARTICLES))
+    mock_embedder = MagicMock()
+    mock_embedder.encode.return_value = mock_embeddings
+
+    mock_quality = {
+        "quality_groundedness": 5,
+        "quality_specificity": 4,
+        "quality_coverage": 5,
+        "quality_format": 4,
+        "quality_rationale": "Excellent digest.",
+    }
+
+    with (
+        patch.object(run_module, "_fetch_all_sources", return_value=(SAMPLE_ARTICLES, ["hackernews"], [])),
+        patch("knowledge_tracker.generators.digest.call_with_retry", return_value=MOCK_CLAUDE_RESPONSE),
+        patch("knowledge_tracker.generators.evaluator.call_with_retry", return_value=MagicMock(
+            content=[MagicMock(type="tool_use", input=mock_quality)]
+        )),
+        patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
+        patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
+        patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
+        patch("anthropic.Anthropic"),
+        patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}),
+    ):
+        run_module.run_daily(cfg)
+
+    today = __import__("datetime").date.today().isoformat()
+    digest_path = Path(vault) / "Digests" / "ai_engineering" / f"{today}.md"
+    content = digest_path.read_text()
+    assert "quality_groundedness: 5" in content
+    assert "quality_coverage: 5" in content
+    assert "quality_rationale: Excellent digest." in content
+
+
 def test_builder_feeds_merged_into_fetch(cfg, vault):
     """Builder blog feeds from builders.yaml are included in the feeds fetch."""
     mock_embeddings = np.array([[0.1] * 384] * 2)

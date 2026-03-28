@@ -27,6 +27,7 @@ from knowledge_tracker.obsidian.writer import write_digest, write_deepdive
 from knowledge_tracker.obsidian.reader import parse_week_digests, parse_seen_urls
 from knowledge_tracker.generators import digest as digest_gen
 from knowledge_tracker.generators import deepdive as deepdive_gen
+from knowledge_tracker.generators import evaluator as evaluator_mod
 from knowledge_tracker import sources
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -187,6 +188,11 @@ def run_daily(cfg: dict) -> None:
             articles=articles, prefs=prefs, date=today, sources_fetched=fetched,
         )
 
+        # Evaluate digest quality (non-fatal — returns {} on failure)
+        quality = evaluator_mod.evaluate(
+            client, model=model, articles=articles, digest_body=result["body"]
+        )
+
         # Write to vault
         write_digest(
             vault_path=vault_path,
@@ -198,6 +204,7 @@ def run_daily(cfg: dict) -> None:
                 "sources_fetched": result["sources_fetched"],
                 "sources_failed": result["sources_failed"],
                 "article_count": len(articles),
+                **quality,
             },
             body=result["body"],
         )
