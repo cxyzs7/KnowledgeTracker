@@ -77,6 +77,7 @@ def test_run_daily_creates_digest(cfg, vault):
     with (
         patch.object(run_module, "_fetch_all_sources", return_value=(SAMPLE_ARTICLES, ["hackernews"], [])),
         patch("knowledge_tracker.generators.digest.call_with_retry", return_value=MOCK_CLAUDE_RESPONSE),
+        patch("knowledge_tracker.generators.evaluator.call_with_retry", return_value=MagicMock(content=[])),
         patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
         patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
         patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
@@ -118,6 +119,7 @@ def test_run_daily_filters_articles_seen_in_recent_digest(cfg, vault):
     with (
         patch.object(run_module, "_fetch_all_sources", return_value=(SAMPLE_ARTICLES, ["hackernews"], [])),
         patch.object(run_module.digest_gen, "generate", side_effect=capture_generate),
+        patch("knowledge_tracker.generators.evaluator.call_with_retry", return_value=MagicMock(content=[])),
         patch("knowledge_tracker.dedup._get_model", return_value=mock_embedder),
         patch("knowledge_tracker.preferences.scorer.SentenceTransformer", return_value=mock_embedder),
         patch("sentence_transformers.SentenceTransformer", return_value=mock_embedder),
