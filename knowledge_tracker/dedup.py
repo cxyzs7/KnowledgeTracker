@@ -67,7 +67,7 @@ def semantic_dedup(articles: list[Article], threshold: float = 0.85) -> list[Art
         rep = articles[best_idx]
         for idx in cluster:
             if idx != best_idx:
-                rep.merged_sources.append(articles[idx].url)
+                rep.merged_sources.append(articles[idx].source)
         result.append(rep)
 
     return result

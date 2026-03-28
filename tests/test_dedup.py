@@ -46,3 +46,14 @@ def test_semantic_dedup_keeps_highest_score_representative():
     assert len(result) == 1
     assert result[0].score == 200
     assert "https://a.com" in result[0].merged_sources or result[0].url == "https://b.com"
+
+def test_semantic_dedup_stores_source_name_not_url_in_merged_sources():
+    articles = [
+        make_article("https://a.com", "RAG retrieval augmented generation tutorial", score=50, source="hackernews"),
+        make_article("https://b.com", "RAG retrieval augmented generation guide", score=200, source="reddit"),
+    ]
+    result = semantic_dedup(articles, threshold=0.80)
+    assert len(result) == 1
+    rep = result[0]
+    assert "hackernews" in rep.merged_sources
+    assert not any(s.startswith("http") for s in rep.merged_sources)
