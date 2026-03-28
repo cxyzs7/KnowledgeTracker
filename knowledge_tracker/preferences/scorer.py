@@ -1,4 +1,5 @@
 import logging
+import math
 import numpy as np
 from urllib.parse import urlparse
 from sentence_transformers import SentenceTransformer
@@ -6,6 +7,27 @@ from sklearn.metrics.pairwise import cosine_similarity
 from knowledge_tracker.models import Article
 
 logger = logging.getLogger(__name__)
+
+_ENGAGEMENT_REF: dict[str, tuple[int, float]] = {
+    "hackernews": (500, 10),
+    "reddit":    (5000, 10),
+    "twitter":   (1000,  8),
+    "bluesky":    (100,  5),
+    "youtube":   (1000,  8),
+}
+
+
+def _engagement_bonus(article: Article) -> float:
+    ref, cap = _ENGAGEMENT_REF.get(article.source, (0, 0))
+    if ref == 0:
+        return 0.0
+    return min(math.log1p(article.score) / math.log1p(ref), 1.0) * cap
+
+
+def _convergence_bonus(article: Article) -> float:
+    source_names = {s for s in article.merged_sources if not s.startswith("http")}
+    unique = len(source_names | {article.source})
+    return min((unique - 1) * 5, 15)
 
 
 def score_and_filter(
@@ -55,7 +77,9 @@ def score_and_filter(
             if kw.lower() in text:
                 structural -= 25
 
-        total = max(-100.0, min(100.0, semantic_score + structural))
+        engagement = _engagement_bonus(article)
+        convergence = _convergence_bonus(article)
+        total = max(-100.0, min(100.0, semantic_score + structural + engagement + convergence))
         scored.append((total, article))
 
     scored.sort(key=lambda x: x[0], reverse=True)

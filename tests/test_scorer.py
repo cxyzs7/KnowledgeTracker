@@ -1,11 +1,23 @@
 # tests/test_scorer.py
+import math
+import pytest
 from unittest.mock import MagicMock
 from knowledge_tracker.models import Article
-from knowledge_tracker.preferences.scorer import score_and_filter
+from knowledge_tracker.preferences.scorer import score_and_filter, _engagement_bonus, _convergence_bonus
 
 def make_article(url, title, desc="", author=None, score=0):
     return Article(url=url, title=title, description=desc, source="hn",
                    author=author, score=score)
+
+def make_sourced_article(source, score, merged_sources=None):
+    return Article(
+        url=f"https://{source}.com/post",
+        title="Test Article",
+        description="",
+        source=source,
+        score=score,
+        merged_sources=merged_sources or [],
+    )
 
 def make_embedder(return_val=None):
     embedder = MagicMock()
@@ -49,3 +61,29 @@ def test_caps_at_max_results():
     embedder = make_embedder()
     result = score_and_filter(articles, topic, None, embedder, max_results=5)
     assert len(result) <= 5
+
+def test_engagement_bonus_hn_at_reference_score():
+    a = make_sourced_article("hackernews", score=500)
+    assert _engagement_bonus(a) == pytest.approx(10.0)
+
+def test_engagement_bonus_zero_for_no_signal_sources():
+    for source in ("github_trending", "feeds", "web_search"):
+        a = make_sourced_article(source, score=999)
+        assert _engagement_bonus(a) == 0.0, f"Expected 0 for source={source}"
+
+def test_convergence_bonus_values():
+    # 1 source → 0
+    a1 = make_sourced_article("hackernews", score=100, merged_sources=[])
+    assert _convergence_bonus(a1) == 0
+
+    # 2 sources → 5
+    a2 = make_sourced_article("hackernews", score=100, merged_sources=["reddit"])
+    assert _convergence_bonus(a2) == 5
+
+    # 3 sources → 10
+    a3 = make_sourced_article("hackernews", score=100, merged_sources=["reddit", "bluesky"])
+    assert _convergence_bonus(a3) == 10
+
+    # 4+ sources → capped at 15
+    a4 = make_sourced_article("hackernews", score=100, merged_sources=["reddit", "bluesky", "youtube"])
+    assert _convergence_bonus(a4) == 15
