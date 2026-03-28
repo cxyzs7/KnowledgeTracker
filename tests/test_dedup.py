@@ -45,7 +45,8 @@ def test_semantic_dedup_keeps_highest_score_representative():
     result = semantic_dedup(articles, threshold=0.80)
     assert len(result) == 1
     assert result[0].score == 200
-    assert "https://a.com" in result[0].merged_sources or result[0].url == "https://b.com"
+    assert result[0].url == "https://b.com"
+    assert "hn" in result[0].merged_sources
 
 def test_semantic_dedup_stores_source_name_not_url_in_merged_sources():
     articles = [
