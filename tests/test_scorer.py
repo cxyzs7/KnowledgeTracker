@@ -1,5 +1,4 @@
 # tests/test_scorer.py
-import math
 import pytest
 from unittest.mock import MagicMock
 from knowledge_tracker.models import Article
@@ -70,6 +69,10 @@ def test_engagement_bonus_zero_for_no_signal_sources():
     for source in ("github_trending", "feeds", "web_search"):
         a = make_sourced_article(source, score=999)
         assert _engagement_bonus(a) == 0.0, f"Expected 0 for source={source}"
+
+def test_engagement_bonus_zero_for_negative_score():
+    a = make_sourced_article("reddit", score=-5)
+    assert _engagement_bonus(a) == 0.0
 
 def test_convergence_bonus_values():
     # 1 source → 0

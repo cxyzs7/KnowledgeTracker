@@ -19,14 +19,13 @@ _ENGAGEMENT_REF: dict[str, tuple[int, float]] = {
 
 def _engagement_bonus(article: Article) -> float:
     ref, cap = _ENGAGEMENT_REF.get(article.source, (0, 0))
-    if ref == 0:
+    if ref == 0 or article.score <= 0:
         return 0.0
     return min(math.log1p(article.score) / math.log1p(ref), 1.0) * cap
 
 
 def _convergence_bonus(article: Article) -> float:
-    source_names = {s for s in article.merged_sources if not s.startswith("http")}
-    unique = len(source_names | {article.source})
+    unique = len(set(article.merged_sources) | {article.source})
     return min((unique - 1) * 5, 15)
 
 
