@@ -7,7 +7,7 @@ obsidian_vault:
 
 claude_model: "claude-sonnet-4-6"
 web_search_provider: "tavily"
-max_articles_per_digest: 40
+max_articles_per_digest: 60
 max_articles_deepdive: 15
 web_search_queries_per_article: 2
 dedup_similarity_threshold: 0.85

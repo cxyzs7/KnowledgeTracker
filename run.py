@@ -65,11 +65,15 @@ def _fetch_all_sources(topic: dict, cfg: dict, builders_cfg: dict | None = None)
 
     # Feeds (topic RSS feeds + global builder blog feeds merged)
     topic_feeds = topic_sources.get("feeds", [])
-    builder_feed_urls = [f["url"] for f in (builders_cfg or {}).get("blogs", {}).get("feeds", [])]
+    builder_feeds = (builders_cfg or {}).get("blogs", {}).get("feeds", [])
+    builder_feed_urls = [f["url"] for f in builder_feeds]
+    if builder_feed_urls:
+        logger.info("Builder blogs: fetching %d feeds: %s", len(builder_feed_urls), [f["name"] for f in builder_feeds])
     all_feeds = topic_feeds + builder_feed_urls
     if all_feeds:
         try:
             arts = sources.web_scraper.fetch_feeds(all_feeds)
+            logger.info("Feeds: got %d articles total (%d topic feeds, %d builder feeds)", len(arts), len(topic_feeds), len(builder_feed_urls))
             all_articles.extend(arts)
             fetched.append("feeds")
         except Exception as e:
@@ -122,26 +126,36 @@ def _fetch_all_sources(topic: dict, cfg: dict, builders_cfg: dict | None = None)
     # YouTube (optional — requires SUPADATA_API_KEY)
     youtube_channels = (builders_cfg or {}).get("youtube", {}).get("channels", [])
     if youtube_channels:
-        try:
-            arts = sources.youtube.fetch(youtube_channels)
-            if arts:
-                all_articles.extend(arts)
-                fetched.append("youtube")
-        except Exception as e:
-            logger.warning("YouTube fetch failed: %s", e)
-            failed.append("youtube")
+        if not os.environ.get("SUPADATA_API_KEY"):
+            logger.warning("Builder YouTube: skipped — SUPADATA_API_KEY not set (%d channels configured)", len(youtube_channels))
+        else:
+            logger.info("Builder YouTube: fetching %d channels: %s", len(youtube_channels), [c["name"] for c in youtube_channels])
+            try:
+                arts = sources.youtube.fetch(youtube_channels)
+                logger.info("Builder YouTube: got %d articles", len(arts))
+                if arts:
+                    all_articles.extend(arts)
+                    fetched.append("youtube")
+            except Exception as e:
+                logger.warning("YouTube fetch failed: %s", e)
+                failed.append("youtube")
 
     # Twitter/X (optional — requires X_BEARER_TOKEN)
     twitter_accounts = (builders_cfg or {}).get("twitter", {}).get("accounts", [])
     if twitter_accounts:
-        try:
-            arts = sources.twitter.fetch(twitter_accounts)
-            if arts:
-                all_articles.extend(arts)
-                fetched.append("twitter")
-        except Exception as e:
-            logger.warning("Twitter fetch failed: %s", e)
-            failed.append("twitter")
+        if not os.environ.get("X_BEARER_TOKEN"):
+            logger.warning("Builder Twitter: skipped — X_BEARER_TOKEN not set (%d accounts configured)", len(twitter_accounts))
+        else:
+            logger.info("Builder Twitter: fetching %d accounts: %s", len(twitter_accounts), [a["handle"] for a in twitter_accounts])
+            try:
+                arts = sources.twitter.fetch(twitter_accounts)
+                logger.info("Builder Twitter: got %d articles", len(arts))
+                if arts:
+                    all_articles.extend(arts)
+                    fetched.append("twitter")
+            except Exception as e:
+                logger.warning("Twitter fetch failed: %s", e)
+                failed.append("twitter")
 
     return all_articles, fetched, failed
 
