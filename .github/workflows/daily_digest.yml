@@ -32,6 +32,8 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           VAULT_PATH: ${{ env.VAULT_PATH }}
         run: uv run python run.py daily
 
