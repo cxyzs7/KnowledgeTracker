@@ -28,11 +28,6 @@ def test_load_config_fails_fast_missing_search_key(monkeypatch):
 
 def test_load_builders_config_returns_accounts_and_channels(tmp_path):
     yaml_content = """
-twitter:
-  accounts:
-    - handle: karpathy
-      id: "33836629"
-      name: Andrej Karpathy
 youtube:
   channels:
     - id: UCXZCJLdBC09xxGZ6gcdrc6A
@@ -46,7 +41,6 @@ blogs:
     p.write_text(yaml_content)
     from knowledge_tracker.config import load_builders_config
     cfg = load_builders_config(str(p))
-    assert cfg["twitter"]["accounts"][0]["handle"] == "karpathy"
     assert cfg["youtube"]["channels"][0]["name"] == "Latent Space"
     assert cfg["blogs"]["feeds"][0]["url"] == "https://eugeneyan.com/rss.xml"
 

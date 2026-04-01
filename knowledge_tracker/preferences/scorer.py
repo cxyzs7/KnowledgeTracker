@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 _ENGAGEMENT_REF: dict[str, tuple[int, float]] = {
     "hackernews": (500, 10),
     "reddit":    (5000, 10),
-    "twitter":   (1000,  8),
     "bluesky":    (100,  5),
     "youtube":   (1000,  8),
 }

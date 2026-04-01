@@ -140,23 +140,6 @@ def _fetch_all_sources(topic: dict, cfg: dict, builders_cfg: dict | None = None)
                 logger.warning("YouTube fetch failed: %s", e)
                 failed.append("youtube")
 
-    # Twitter/X (optional — requires X_BEARER_TOKEN)
-    twitter_accounts = (builders_cfg or {}).get("twitter", {}).get("accounts", [])
-    if twitter_accounts:
-        if not os.environ.get("X_BEARER_TOKEN"):
-            logger.warning("Builder Twitter: skipped — X_BEARER_TOKEN not set (%d accounts configured)", len(twitter_accounts))
-        else:
-            logger.info("Builder Twitter: fetching %d accounts: %s", len(twitter_accounts), [a["handle"] for a in twitter_accounts])
-            try:
-                arts = sources.twitter.fetch(twitter_accounts)
-                logger.info("Builder Twitter: got %d articles", len(arts))
-                if arts:
-                    all_articles.extend(arts)
-                    fetched.append("twitter")
-            except Exception as e:
-                logger.warning("Twitter fetch failed: %s", e)
-                failed.append("twitter")
-
     return all_articles, fetched, failed
 
 

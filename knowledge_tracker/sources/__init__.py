@@ -6,5 +6,4 @@ from knowledge_tracker.sources import (
     github_trending,
     bluesky,
     youtube,
-    twitter,
 )
